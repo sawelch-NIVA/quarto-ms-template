@@ -1,0 +1,127 @@
+---
+# Render this project via `targets::tar_make()` (the `site` target in
+# _targets.R), not `quarto render` on this file directly — see index.qmd.
+#
+# This is a minimal reproducible example (MRE) for comparing R's main
+# table packages side by side across HTML and Word (docx) output. Render
+# both formats and open output/supplementary/tables-mre.html and .docx
+# next to each other when deciding which package to standardise on.
+#
+# To surface this notebook in the site navigation, see the comment in
+# supplementary/notebook-template.qmd.
+title: "Tables MRE: kable / kableExtra / gt / flextable / huxtable"
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(knitr)
+library(kableExtra)
+library(gt)
+library(flextable)
+library(huxtable)
+
+set.seed(1)
+dat <- data.frame(
+  Group = rep(c("Control", "Treatment"), each = 3),
+  Metric = rep(c("Alpha", "Beta", "Gamma"), 2),
+  Value = round(rnorm(6, mean = 10, sd = 2), 2),
+  p = round(runif(6, 0, 0.1), 3)
+)
+```
+
+# Why this notebook exists
+
+NB: Word output is still corrupted as of this version.
+
+Tables are a pain. In general, in Markdown, in HTML, in Word, and especially in pandoc-generated .docx files.
+
+The same table code does **not** produce equivalent output in HTML vs.
+docx — each package has a different HTML-vs-Word story. Notes below are
+from direct testing in this template.
+# `knitr::kable()`
+
+`knitr::kable()`
+
+- returns a markdown pipe table
+- no special formatting
+- supported by HTML (pretty) and Word (unstyled (?), not great)
+
+```{r}
+#| label: tbl-kable
+#| tbl-cap: "kable"
+kable(dat)
+```
+
+# `kableExtra`
+
+- returns pretty HTML tables
+- supports Bootstrap
+- 🛑 crashes the docx render entirely
+
+::: {.content-visible when-format="docx"}
+
+```{r}
+#| label: tbl-kableextra
+#| tbl-cap: "kableExtra"
+#| eval: !expr knitr::is_html_output()
+kable(dat) |>
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
+  row_spec(0, bold = TRUE)
+```
+
+*`kableExtra` output omitted here — see the note above.*
+:::
+
+# `gt`
+
+- pretty HTML with colouring
+- 🛑 rendering to docx crashes the renderer (unless `webshot2` is installed, then returns static image)
+
+::: {.content-visible when-format="docx"}
+
+```{r}
+#| label: tbl-gt
+#| tbl-cap: "gt"
+#| eval: !expr knitr::is_html_output()
+gt(dat) |>
+  tab_header(title = "gt table") |>
+  fmt_number(columns = c(Value, p), decimals = 2) |>
+  data_color(columns = Value, palette = "viridis")
+```
+
+*`gt` output omitted here — see the note above.*
+:::
+
+# `flextable`
+
+- generally pretty HTML (doesn't respect Quarto/CSS styles?) and .docx output
+- requires flextable Lua filter to be set in frontmatter (although it isn't here???)
+- targets the Word OOXML table model directly (via `officer`)
+
+```{r}
+#| label: tbl-flextable
+#| tbl-cap: "flextable"
+# huxtable::bold() and flextable::bold() collide once both packages are
+# loaded — namespace explicitly rather than relying on load order.
+flextable(dat) |>
+  theme_vanilla() |>
+  flextable::bold(part = "header") |> # namespace collision
+  autofit()
+```
+
+# `huxtable`
+
+- also pretty HTML (but not well spaced?) and .docx output
+- I've never used this before, but it looks fine?
+
+```{r}
+#| label: tbl-huxtable
+#| tbl-cap: "huxtable"
+hux <- as_huxtable(dat)
+bold(hux)[1, ] <- TRUE
+bottom_border(hux)[1, ] <- 1
+hux
+```
+
+# Recommendation

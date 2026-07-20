@@ -14,7 +14,13 @@ required_pkgs <- c(
   "targets",     # pipeline
   "tarchetypes", # tar_quarto() and friends
   "quarto",      # render + project helpers
-  "tibble"       # used by the example target — swap/extend as needed
+  "tibble",      # used by the example target — swap/extend as needed
+  # Used by supplementary/tables-mre.qmd — drop these if you delete that
+  # notebook and don't need cross-format table comparisons.
+  "kableExtra",
+  "gt",
+  "flextable",
+  "huxtable"
 )
 
 missing_pkgs <- required_pkgs[

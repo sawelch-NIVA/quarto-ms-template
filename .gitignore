@@ -10,3 +10,7 @@
 /_targets/
 _freeze/*
 .claude/
+
+!meta
+meta/*
+!meta/meta

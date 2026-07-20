@@ -1,7 +1,0 @@
----
-# Render this project via `targets::tar_make()` (the `site` target in
-# _targets.R), not `quarto render about.qmd` directly — see index.qmd.
-title: "About"
----
-
-About this site

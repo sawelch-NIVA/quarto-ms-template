@@ -1,0 +1,36 @@
+---
+# ! Render this project via `targets::tar_make()` (the `site` target in
+# ! _targets.R), not `quarto render` on this file directly — see index.qmd.
+#
+# Files under supplementary/ are rendered as part of the site automatically
+# (Quarto renders every .qmd in the project by default), but they are NOT
+# added to the navbar/sidebar automatically. To surface this notebook in
+# the site navigation, add an entry under `website:` in _quarto.yml, e.g.:
+#
+#   website:
+#     navbar:
+#       left:
+#         - href: supplementary/notebook-template.qmd
+#           text: "Supplementary: <short label>"
+#
+# If it's meant to stay off the public nav (e.g. a working/scratch
+# notebook), leave it unlinked — it'll still render, just won't be listed.
+title: "Supplementary Notebook Title"
+---
+
+## Purpose
+
+Describe what this notebook explores and how it relates to the main
+manuscript ([index.qmd](../index.qmd)).
+
+```{r}
+#| label: setup
+#| include: false
+library(targets)
+```
+
+```{r}
+#| label: explore
+data <- tar_read(data)
+head(data)
+```
