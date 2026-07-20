@@ -56,7 +56,7 @@ has a comment at the top of its YAML front matter as a reminder.
 HTML, docx, and typst (PDF) are all configured under `format:` in
 `_quarto.yml`, and all three come out of a single `tar_make()` run — no
 separate pipeline targets needed. `format.docx.reference-doc` points at
-`db-space-line-n.docx`, which supplies all the Word paragraph/table
+`styles/db-space-line-n.docx`, which supplies all the Word paragraph/table
 styles pandoc writes into (see below). Typst PDFs render via Quarto's
 bundled Typst compiler — no separate Typst install required.
 
@@ -94,11 +94,11 @@ before picking a tables package — several fail outright (not just
   extraction (not a PDF viewer glitch), no error or warning at render
   time. Keep typst-bound tables short enough to fit on one page.
 
-## The Word reference doc (`db-space-line-n.docx`)
+## The Word reference doc (`styles/db-space-line-n.docx`)
 
 Pandoc/Quarto write Word output by re-using named styles from this
 file — anything it doesn't define, Word silently substitutes a
-generic default for. As shipped, `db-space-line-n.docx` covers
+generic default for. As shipped, `styles/db-space-line-n.docx` covers
 headings, title/subtitle, quotes, and line numbering, but is missing
 several styles pandoc actively references, most importantly:
 

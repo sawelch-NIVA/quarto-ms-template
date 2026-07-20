@@ -9,7 +9,7 @@
 #
 # To surface this notebook in the site navigation, see the comment in
 # supplementary/notebook-template.qmd.
-title: "Tables MRE: kable / kableExtra / gt / flextable / huxtable / DT"
+title: "Tables in Quarto: Packages, formats, and bugs"
 ---
 
 ```{r}

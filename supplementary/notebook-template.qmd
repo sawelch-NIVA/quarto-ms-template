@@ -18,14 +18,17 @@
 title: "Supplementary Notebook Title"
 ---
 
-## Purpose
+# Purpose
 
 Describe what this notebook explores and how it relates to the main
-manuscript ([index.qmd](../index.qmd)).
+manuscript ([index.qmd](../index.qmd)). Depending on the needs of the 
+project, the layout of a notebook may be a miniature version of the main manuscript (Introduction, Methods, Results, etc.) or something less formulaic. 
 
 ```{r}
 #| label: setup
 #| include: false
+
+# It's generally wise to set include: false wherever you load your packages, as the function returns a lot of session-specific information which is rarely relevant to documents
 library(targets)
 ```
 
@@ -34,3 +37,5 @@ library(targets)
 data <- tar_read(data)
 head(data)
 ```
+
+# References
