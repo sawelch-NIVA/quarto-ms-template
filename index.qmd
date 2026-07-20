@@ -1,0 +1,36 @@
+---
+# Render this project via `targets::tar_make()` (the `site` target in
+# _targets.R), not `quarto render index.qmd` directly — this file reads
+# pipeline outputs with tar_read()/tar_load(), so a direct render can use
+# stale or missing data if the pipeline hasn't been run.
+title: "Manuscript Title"
+author:
+  - name: "Your Name"
+    affiliation: "Your Institution"
+date: today
+abstract: |
+  Write a short abstract of the manuscript here.
+---
+
+## Introduction
+
+Write your introduction here, citing sources as needed [@example2024].
+
+```{r}
+#| label: setup
+#| include: false
+library(targets)
+```
+
+## Results
+
+```{r}
+#| label: fig-example
+#| fig-cap: "Example figure generated from the pipeline."
+tar_read(model)
+```
+
+## References
+
+::: {#refs}
+:::

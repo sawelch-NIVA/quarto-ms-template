@@ -1,0 +1,55 @@
+# runme.R ----
+# Bootstrap script for this manuscript template.
+#
+# Run this once after cloning to check dependencies + folder structure,
+# then build the analysis pipeline and render the manuscript.
+#
+# This script does NOT scaffold a new Quarto project — the project files
+# (index.qmd, _quarto.yml, etc.) are already part of this template and are
+# version-controlled. Re-running quarto::quarto_create_project() here would
+# overwrite your customised YAML/content, so don't.
+
+# 1. Check required packages ----
+required_pkgs <- c(
+  "targets",     # pipeline
+  "tarchetypes", # tar_quarto() and friends
+  "quarto",      # render + project helpers
+  "tibble"       # used by the example target — swap/extend as needed
+)
+
+missing_pkgs <- required_pkgs[
+  !vapply(required_pkgs, requireNamespace, logical(1), quietly = TRUE)
+]
+
+if (length(missing_pkgs) > 0) {
+  message("Installing missing packages: ", paste(missing_pkgs, collapse = ", "))
+  install.packages(missing_pkgs)
+}
+
+# 2. Ensure folder structure exists ----
+# R/       - custom functions, sourced by _targets.R via tar_source()
+# data/    - raw + processed data (gitignore large/sensitive files)
+# output/  - figures, tables, rendered docs
+# styles/  - CSL files, reference docx templates, etc.
+required_dirs <- c("R", "data", "output", "styles")
+
+for (d in required_dirs) {
+  if (!dir.exists(d)) {
+    dir.create(d)
+    message("Created missing directory: ", d)
+  }
+}
+
+# 3. Sanity-check the Quarto install ----
+# Fails loudly and early if Quarto CLI isn't on PATH, rather than deep into
+# tar_make().
+quarto::quarto_version()
+
+# 4. Run the targets pipeline ----
+# Builds all data/model/figure targets AND renders index.qmd, since a
+# tar_quarto() target is wired into _targets.R.
+targets::tar_make()
+
+# 5. Inspect pipeline status ----
+# Handy after tar_make() to confirm what built and see timings/dependencies.
+targets::tar_visnetwork()

@@ -1,0 +1,29 @@
+# _quarto.yml ----
+# Using the `website` project type rather than `manuscript` — manuscript
+# projects force a Jupyter engine/kernel even for pure-R content, which we
+# don't want here.
+
+project:
+  type: website
+  output-dir: output
+
+website:
+  title: "Manuscript Title"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: about.qmd
+        text: About
+
+format:
+  html:
+    css: styles.css
+    theme: cosmo
+    toc: true
+
+bibliography: references.bib
+# csl: styles/journal.csl # uncomment once you've added a CSL file to styles/
+
+execute:
+  freeze: auto
