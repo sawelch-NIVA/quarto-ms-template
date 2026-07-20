@@ -12,7 +12,7 @@ abstract: |
   Write a short abstract of the manuscript here.
 ---
 
-# Introduction {@sec-intro}
+# Introduction {#sec-intro}
 
 Write your introduction here, citing sources as needed [@example2024].
 
@@ -34,7 +34,7 @@ $$ {#eq-poisson}
 
 # Results
 
-You can refer back to sections [@sec-intro].
+You can refer back to sections [@sec-intro] We had to put `{#sec-intro}` after "Introduction" in the header above.
 
 This is a figure @fig-example.
 
@@ -57,6 +57,46 @@ model <- tar_read(calculate_model)
 plot(data$x, data$y)
 abline(model)
 ```
+
+
+::: {.content-hidden when-format="html"}
+# Supplementary Information
+
+Because notebooks, etc. are provided via the sidebar, they don't show up in HTML or Word versions. So we hide them when the format is HTML.
+
+```{r}
+#| label: si-links
+#| output: asis
+
+# Auto-generated from whatever's actually in supplementary/ - add a new
+# notebook there and it shows up here with no manual list to maintain.
+# Excludes notebook-template.qmd (a starting point for new notebooks, not
+# content). Docx/typst output only: this whole block is hidden for html
+# (the sidebar nav covers it there), and `ext` below only knows how to
+# build links for the two non-html formats.
+si_files <- list.files(here("supplementary"), pattern = "\\.qmd$")
+si_files <- sort(setdiff(si_files, "notebook-template.qmd"))
+
+# TODO: Doesn't work when we run in an int. session as knitr option returns null. worth fixing?
+ext <- switch(
+  knitr::opts_knit$get("rmarkdown.pandoc.to"),
+  docx = "docx",
+  typst = "pdf",
+  NA_character_
+)
+
+if (!is.na(ext)) {
+  for (f in si_files) {
+    title <- rmarkdown::yaml_front_matter(here("supplementary", f))$title
+    base <- tools::file_path_sans_ext(f)
+    cat(sprintf("- [%s](supplementary/%s.%s)\n", title, base, ext))
+  }
+}
+
+# TODO: This works, but the formatting's messy and at least in Word they don't look like links
+```
+
+:::
 
 
 # References

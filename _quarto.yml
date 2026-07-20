@@ -41,11 +41,18 @@ format:
     css: styles.css
     theme: cosmo
     toc: true
+    code-fold: true
+    code-overflow: wrap
+    monofont: "Fira Code"
+    grid:
+      sidebar-width: 400px # reduce sidebar width to give main content more room to breathe
+
   docx:
     # reference-doc: styles/standard.docx         # bog standard word formatting
     reference-doc: styles/db-space-line-n.docx    # for revisions
     toc: true # probably don't want this for the final version of anything
-  typst: default
+  typst:
+    number-sections: true
 
 bibliography: references.bib
 csl: styles/apa.csl # other styles at https://github.com/citation-style-language/styles
@@ -58,3 +65,14 @@ execute:
   freeze: true # I think (but aren't sure) this conflicts with targets
   echo: false # we might concievably want to echo source code in HTML, but for Word/PDF this is a sensible default
 
+
+authors:
+  - name: Sam Welch
+    affiliation: Norwegian Institute for Water Research
+    roles: [conceptualization, data curation, formal analysis, investigation, methodology, software, validation, visualization]
+    corresponding: true
+    email: sam.welch@niva.no
+    orcid: 0000-0003-4743-4562
+
+comments:
+  hypothesis: true # enables comments using a 3rd party service
