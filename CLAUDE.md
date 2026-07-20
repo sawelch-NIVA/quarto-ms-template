@@ -20,24 +20,42 @@ directly**, except for quick iteration on a single file while writing it.
 `index.qmd` and any notebook using `tar_read()`/`tar_load()` depends on
 the `_targets/` data store; a direct render can silently pick up stale
 or missing data. Every `.qmd` has a YAML-comment reminder of this.
-`_targets.R` has one `tar_quarto(name = site, path = ".")` target that
-renders the whole project (all formats) as the pipeline's last step —
+`_targets.R` has one `tar_quarto(name = render_site, path = ".")` target
+that renders the whole project (all formats) as the pipeline's last step —
 confirmed this single target produces html+docx+typst together, no need
 for per-format targets.
+
+## Conventions
+
+- **Target names are verbs** (`simulate_data`, `calculate_model`,
+  `render_site`) — every target is an action, not just the noun it
+  produces. Applies to every `tar_target()`/`tar_quarto()` added going
+  forward.
+- **`here::here()` (with an explicit `here::i_am(<this file's own path>)`
+  anchor) for every file path constructed in R** — scripts and notebooks
+  alike (`_targets.R`, `runme.R`, `generate-images.R`,
+  `data-raw/import-data.R`, every `.qmd`'s setup chunk). Keeps path
+  resolution identical regardless of whether something is run via
+  `tar_make()`, knit standalone from an editor, or `Rscript`'d from an
+  arbitrary directory. `i_am()`'s argument is always the *calling* file's
+  own path relative to the project root — not the path of whatever it's
+  trying to reach (easy to get backwards).
 
 ## Structure
 
 ```
-_targets.R       pipeline: data → model → site (tar_quarto, renders everything)
+_targets.R       pipeline: simulate_data → calculate_model → render_site (tar_quarto, renders everything)
 _quarto.yml      project config: formats, theme, biblio/CSL, fig defaults
 R/               functions, tar_source()'d automatically from _targets.R
 data-raw/        raw/as-received data + import scripts (tracked in git)
 data/            processed data from the pipeline (git-ignored, regenerated)
+img/             fixture images for supplementary/images-mre.qmd (tracked in git)
 index.qmd        the manuscript
 supplementary/   extra notebooks (rendered automatically, not auto-linked in nav)
 styles/          CSL file + Word reference docs (db-space-line-n.docx, standard.docx)
 output/          rendered output, all formats (git-ignored, rebuilt by tar_make())
 runme.R          one-time bootstrap: installs deps, makes folders, tar_make()
+generate-images.R  one-time generator for img/ fixtures (root, not R/ — see Pipeline gotchas)
 ```
 
 `data-raw/` vs `data/` mirrors the `usethis::use_data_raw()` R-package
@@ -115,19 +133,59 @@ Full writeup lives in the notebook; headline findings:
   is correct. Mitigation: keep typst-bound tables short enough to fit on
   one page, or exclude large tables from the typst target.
 
+### Images & diagrams (`supplementary/images-mre.qmd`)
+Full writeup lives in the notebook; headline findings:
+
+- **Mermaid diagrams (```` ```{mermaid} ````) work natively across
+  html/docx/typst with zero extra install** — Quarto converts them to a
+  static PNG for docx/typst on its own, confirmed with no system
+  Node/Deno/mermaid-cli on `PATH` in this environment. The docx/typst
+  version is a raster image, not an editable diagram, though — a
+  collaborator "fixing it in Word" is editing a picture.
+- **PNG/JPEG are the only formats confirmed to work everywhere with zero
+  warnings.**
+- **SVG is native (vector) in html and typst** — typst confirmed via
+  `pdftotext` pulling real text out of the compiled PDF, not a rasterized
+  blob — **but docx needs a system `rsvg-convert` binary (librsvg) on
+  `PATH`.** Without it, pandoc warns
+  (`Could not convert image ...svg: check that rsvg-convert is in path`)
+  and embeds the raw SVG with no raster fallback — a known way to get a
+  blank/broken image in Word. Not visually confirmed in actual Word (no
+  Word/LibreOffice available in this environment) — treat as
+  unverified-risky, not verified-fine, until checked in real Word.
+- **TIFF hard-errors typst** (`error: unknown image format`) — typst's
+  image decoder doesn't support it at all. **Consequential part:** because
+  `tar_quarto()`/`quarto render --to all` renders every format from one
+  invocation, that single typst failure blocks html and docx from being
+  updated too, even though both render clean with no warning for the same
+  TIFF on their own. Confirmed by timestamp: after a typst failure,
+  `output/*.html` and `output/*.docx` are left stale from the previous
+  run. A stale-looking html/docx after `tar_make()` can mean a typst error
+  further up the log, not that the pipeline didn't run.
+- Fine text/thin lines that read fine at 100% become illegible once a
+  figure is scaled to fit page width — confirmed by rendering and
+  inspecting the actual PDF page, not just the source image. Don't trust
+  legibility at authoring size as evidence it holds at rendered size.
+- Uncompressed TIFF from synthetic test content came to ~24MB vs. ~850KB
+  PNG / ~350KB JPEG for identical content — LZW compression brought it to
+  ~1MB. Compress before committing raster fixtures to git.
+
 ### Pipeline gotchas
 - `tar_source()` sources every `.R` file directly under `R/` on every
   pipeline load (`tar_make()`, `tar_visnetwork()`, even `tar_manifest()`).
   `runme.R` was once accidentally moved into `R/` — since it calls
   `tar_make()` itself, that would make defining the pipeline re-trigger
-  the pipeline. Keep `runme.R` at the project root, never in `R/`.
+  the pipeline. Keep `runme.R` at the project root, never in `R/` — same
+  reasoning applies to `generate-images.R` (a one-off script with file
+  I/O side effects, not a function library).
 - `tarchetypes::tar_quarto()`'s dependency-scanning pass evaluates chunk
   options like `eval: !expr is_html` without running the setup chunk
   first, so you'll see harmless `Error in eval(x, envir = envir) : object
   'is_html' not found` messages during `tar_make()` even on a successful
   build. Not fatal — the actual quarto CLI subprocess render (which does
   run setup first) is what determines success. Don't chase this as a
-  real error; check the final `✔ site completed` / exit code instead.
+  real error; check the final `✔ render_site completed` / exit code
+  instead.
 
 ## Known drift to watch for
 

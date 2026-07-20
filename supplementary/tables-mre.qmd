@@ -1,5 +1,5 @@
 ---
-# Render this project via `targets::tar_make()` (the `site` target in
+# Render this project via `targets::tar_make()` (the `render_site` target in
 # _targets.R), not `quarto render` on this file directly — see index.qmd.
 #
 # This is a minimal reproducible example (MRE) for comparing R's main
@@ -27,7 +27,7 @@ library(DT)
 # not just "HTML vs. not-HTML" — gt works for typst but not docx, for
 # example. Gate chunks on the real target rather than guessing.
 pandoc_to <- knitr::opts_knit$get("rmarkdown.pandoc.to")
-is_html <- isTRUE(knitr::is_html_output())
+is_html <- identical(pandoc_to, "html")
 is_typst <- identical(pandoc_to, "typst")
 is_docx <- identical(pandoc_to, "docx")
 

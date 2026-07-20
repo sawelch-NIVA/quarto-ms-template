@@ -6,6 +6,13 @@
 # Load packages required to define the pipeline:
 library(targets)
 library(tarchetypes) # tar_quarto() and friends
+library(here) # anchors file paths to the project root regardless of where
+# tar_make()/quarto render/knit is actually invoked from
+
+# Establishes the project root here() resolves to, independent of relying on
+# .git/.Rproj auto-detection - matters if this template is ever unzipped
+# rather than git-cloned.
+here::i_am("_targets.R")
 
 # Set target options:
 tar_option_set(
@@ -49,22 +56,24 @@ tar_source()
 # tar_source("other_functions.R") # Source other scripts as needed.
 
 # Replace the target list below with your own:
+# Target names are verbs describing the action each target performs - every
+# target is an action, not just the noun it produces (personal preference).
 list(
   tar_target(
-    name = data,
+    name = simulate_data,
     command = tibble(x = rnorm(100), y = rnorm(100))
     # format = "qs" # Efficient storage for general data objects.
   ),
   tar_target(
-    name = model,
-    command = coefficients(lm(y ~ x, data = data))
+    name = calculate_model,
+    command = coefficients(lm(y ~ x, data = simulate_data))
   ),
   # Renders the whole Quarto project (index.qmd, about.qmd, ...). tarchetypes
   # scans each .qmd for tar_read()/tar_load() calls and wires up the matching
-  # target dependencies automatically (e.g. index.qmd's tar_read(model) makes
-  # this target depend on `model`).
+  # target dependencies automatically (e.g. index.qmd's tar_read(calculate_model)
+  # makes this target depend on `calculate_model`).
   tar_quarto(
-    name = site,
+    name = render_site,
     path = "."
   )
 )

@@ -4,7 +4,10 @@
 # function in R/ and call it from a tar_target(), not to run this script
 # by hand each time.
 
-raw <- read.csv("data-raw/survey-responses.csv")
+library(here)
+here::i_am("data-raw/import-data.R")
+
+raw <- read.csv(here("data-raw", "survey-responses.csv"))
 
 # clean_survey_data() would live in R/functions.R
 # clean <- clean_survey_data(raw)

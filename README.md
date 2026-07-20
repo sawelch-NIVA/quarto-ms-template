@@ -94,6 +94,23 @@ before picking a tables package — several fail outright (not just
   extraction (not a PDF viewer glitch), no error or warning at render
   time. Keep typst-bound tables short enough to fit on one page.
 
+`supplementary/images-mre.qmd` is the same kind of comparison for images
+and diagrams: mermaid, auto-generated (ggplot2) figures, and images
+created elsewhere and loaded from a file (PNG/JPEG/SVG/TIFF), across
+HTML, docx, and typst. Headline findings:
+
+- Mermaid diagrams work natively across all three formats with no extra
+  install — Quarto converts them to PNG for docx/typst on its own.
+- PNG/JPEG are the safe defaults everywhere; SVG needs a system
+  `rsvg-convert` (librsvg) install for docx to embed cleanly.
+- **TIFF hard-errors typst outright — and because all formats render in
+  one pass, that one failure blocks html and docx from updating too**,
+  even though they'd render fine on their own. Convert TIFF to PNG before
+  embedding.
+- A figure that's legible at authoring size isn't necessarily legible
+  once scaled down to page width — check the actual rendered output, not
+  the source image.
+
 ## The Word reference doc (`styles/db-space-line-n.docx`)
 
 Pandoc/Quarto write Word output by re-using named styles from this
@@ -124,3 +141,11 @@ Add references to `references.bib` and cite with `[@key]`. The
 citation style is set via `csl: styles/apa.csl` in `_quarto.yml` —
 swap in your target journal's `.csl` from the [Zotero Style
 Repository](https://www.zotero.org/styles).
+
+## Quarto Extensions
+
+Optional and required extensions:
+
+Quarto Wingman: 
+- Superior Zotero citation from the Positron Quarto source editor
+- Lots of other stuff I haven't tried

@@ -1,6 +1,6 @@
 ---
-# ! Render this project via `targets::tar_make()` (the `site` target in
-# ! _targets.R), not `quarto render` on this file directly — see index.qmd.
+# ! Render this project via `targets::tar_make()` (the `render_site` target
+# ! in _targets.R), not `quarto render` on this file directly — see index.qmd.
 #
 # Files under supplementary/ are rendered as part of the site automatically
 # (Quarto renders every .qmd in the project by default), but they are NOT
@@ -30,11 +30,19 @@ project, the layout of a notebook may be a miniature version of the main manuscr
 
 # It's generally wise to set include: false wherever you load your packages, as the function returns a lot of session-specific information which is rarely relevant to documents
 library(targets)
+library(here)
+
+# i_am()'s argument is THIS file's own path relative to the project root -
+# not _targets.R's path. Anchors here() to the root regardless of where this
+# notebook gets knit from.
+i_am("supplementary/notebook-template.qmd")
 ```
+
+By default code chunk output to the console is rendered as is (straight onto a white background in HTML, although it gets a grey background in Word and PDF). It looks pretty bad. You also can't reference it.
 
 ```{r}
 #| label: explore
-data <- tar_read(data)
+data <- tar_read(simulate_data)
 head(data)
 ```
 

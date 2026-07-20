@@ -6,13 +6,35 @@
 project:
   type: website
   output-dir: output
+  # Execute every .qmd's code with working directory = project root, not
+  # the file's own folder (Quarto's default). Without this, tar_read()/
+  # tar_load() calls in supplementary/*.qmd can't find ../_targets since
+  # `targets` resolves the store relative to the R session's working
+  # directory, not via here() — confirmed by direct testing, see CLAUDE.md.
+  execute-dir: project
 
 website:
   title: "Manuscript Title"
-  navbar:
-    left:
-      - href: index.qmd
-        text: Home
+  sidebar:
+    style: "docked"
+    search: true
+    contents:
+        - section: "Article"
+          contents:
+            - href: index.qmd
+              text: "Main File"
+        - section: "Notebooks" # Notebooks with programmatic logic
+          contents:
+            - href: supplementary\notebook-template.qmd
+              text: "Notebook Template"
+              icon: journal-code
+            - href: supplementary\images-mre.qmd
+              text: "Rendering Images in Quarto"
+              icon: journal-code
+            - href: supplementary\tables-mre.qmd
+              text: "Rendering Tables in Quarto"
+              icon: journal-code
+        - section: "Appendices" # Static files
 
 format: 
   html:
@@ -33,6 +55,6 @@ fig-height: 4
 fig-dpi: 300
 
 execute:
-  freeze: auto
+  freeze: true # I think (but aren't sure) this conflicts with targets
   echo: false # we might concievably want to echo source code in HTML, but for Word/PDF this is a sensible default
 

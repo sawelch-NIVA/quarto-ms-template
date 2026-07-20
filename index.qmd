@@ -1,5 +1,5 @@
 ---
-# Render this project via `targets::tar_make()` (the `site` target in
+# Render this project via `targets::tar_make()` (the `render_site` target in
 # _targets.R), not `quarto render index.qmd` directly — this file reads
 # pipeline outputs with tar_read()/tar_load(), so a direct render can use
 # stale or missing data if the pipeline hasn't been run.
@@ -20,11 +20,13 @@ Write your introduction here, citing sources as needed [@example2024].
 #| label: setup
 #| include: false
 library(targets)
+library(here)
+here::i_am("index.qmd")
 ```
 
 # Methods
 
-We can add full-line equations with `\$\$` and reference them [@eq-poisson]. This uses... LatEX? Mathjax?
+We can add full-line equations with `\$\$` and reference them [@eq-poisson]. This uses... LatEX? Mathjax? Note that inline code fences don't get any special styling in Word. 
 
 $$
 p(x) = \frac{e^{-\lambda} \lambda^{x}}{x !}
@@ -39,8 +41,8 @@ This is a figure @fig-example.
 ```{r}
 #| label: fig-example
 #| fig-cap: "Example figure generated from the pipeline. In general, figures should always have captions"
-data <- tar_read(data)
-model <- tar_read(model)
+data <- tar_read(simulate_data)
+model <- tar_read(calculate_model)
 plot(data$x, data$y)
 abline(model)
 ```
@@ -50,8 +52,8 @@ This is a table @tbl-example. For some reason, they use different caption variab
 ```{r}
 #| label: tbl-example
 #| tbl-cap: "Example figure generated from the pipeline. In general, figures should always have captions"
-data <- tar_read(data)
-model <- tar_read(model)
+data <- tar_read(simulate_data)
+model <- tar_read(calculate_model)
 plot(data$x, data$y)
 abline(model)
 ```
