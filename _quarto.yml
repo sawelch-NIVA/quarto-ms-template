@@ -14,14 +14,16 @@ website:
       - href: index.qmd
         text: Home
 
-format:
+format: 
   html:
     css: styles.css
     theme: cosmo
     toc: true
   docx:
-    reference-doc: db-space-line-n.docx
-    toc: true
+    # reference-doc: styles/standard.docx         # bog standard word formatting
+    reference-doc: styles/db-space-line-n.docx    # for revisions
+    toc: true # probably don't want this for the final version of anything
+  typst: default
 
 bibliography: references.bib
 csl: styles/apa.csl # other styles at https://github.com/citation-style-language/styles

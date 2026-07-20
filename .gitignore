@@ -8,6 +8,7 @@
 
 /output/
 /_targets/
+/data/
 _freeze/*
 .claude/
 

@@ -34,14 +34,28 @@ $$ {#eq-poisson}
 
 You can refer back to sections [@sec-intro].
 
+This is a figure @fig-example.
+
 ```{r}
 #| label: fig-example
-#| fig-cap: "Example figure generated from the pipeline."
+#| fig-cap: "Example figure generated from the pipeline. In general, figures should always have captions"
 data <- tar_read(data)
 model <- tar_read(model)
 plot(data$x, data$y)
 abline(model)
 ```
+
+This is a table @tbl-example. For some reason, they use different caption variables.
+
+```{r}
+#| label: tbl-example
+#| tbl-cap: "Example figure generated from the pipeline. In general, figures should always have captions"
+data <- tar_read(data)
+model <- tar_read(model)
+plot(data$x, data$y)
+abline(model)
+```
+
 
 # References
 

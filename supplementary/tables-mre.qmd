@@ -3,13 +3,13 @@
 # _targets.R), not `quarto render` on this file directly — see index.qmd.
 #
 # This is a minimal reproducible example (MRE) for comparing R's main
-# table packages side by side across HTML and Word (docx) output. Render
-# both formats and open output/supplementary/tables-mre.html and .docx
-# next to each other when deciding which package to standardise on.
+# table packages side by side across HTML, docx, and typst (PDF) output.
+# Render all three formats and open them next to each other when
+# deciding which package to standardise on.
 #
 # To surface this notebook in the site navigation, see the comment in
 # supplementary/notebook-template.qmd.
-title: "Tables MRE: kable / kableExtra / gt / flextable / huxtable"
+title: "Tables MRE: kable / kableExtra / gt / flextable / huxtable / DT"
 ---
 
 ```{r}
@@ -20,6 +20,16 @@ library(kableExtra)
 library(gt)
 library(flextable)
 library(huxtable)
+library(DT)
+
+# Tested directly in this template (not assumed from docs): which output
+# a package actually degrades to depends on the specific target format,
+# not just "HTML vs. not-HTML" — gt works for typst but not docx, for
+# example. Gate chunks on the real target rather than guessing.
+pandoc_to <- knitr::opts_knit$get("rmarkdown.pandoc.to")
+is_html <- isTRUE(knitr::is_html_output())
+is_typst <- identical(pandoc_to, "typst")
+is_docx <- identical(pandoc_to, "docx")
 
 set.seed(1)
 dat <- data.frame(
@@ -28,24 +38,135 @@ dat <- data.frame(
   Value = round(rnorm(6, mean = 10, sd = 2), 2),
   p = round(runif(6, 0, 0.1), 3)
 )
+
+# A "big stupid table" — enough rows and long enough text to actually
+# stress column widths, wrapping and pagination, instead of the 6-row toy
+# example above which hides all of that.
+words <- c(
+  "alpha",
+  "beta",
+  "gamma",
+  "delta",
+  "epsilon",
+  "zeta",
+  "eta",
+  "theta",
+  "iota",
+  "kappa",
+  "lambda",
+  "mu",
+  "nu",
+  "xi",
+  "omicron",
+  "pi",
+  "rho",
+  "sigma",
+  "tau",
+  "upsilon"
+)
+make_note <- function() {
+  n_sentences <- sample(1:3, 1)
+  paste(
+    replicate(n_sentences, {
+      n_words <- sample(8:20, 1)
+      s <- paste(sample(words, n_words, replace = TRUE), collapse = " ")
+      paste0(toupper(substring(s, 1, 1)), substring(s, 2), ".")
+    }),
+    collapse = " "
+  )
+}
+big <- data.frame(
+  ID = seq_len(30),
+  Group = sample(
+    c("Control", "Treatment A", "Treatment B"),
+    30,
+    replace = TRUE
+  ),
+  Score = round(rnorm(30, 50, 10), 1),
+  Notes = vapply(seq_len(30), \(i) make_note(), character(1))
+)
+
+# A bigger dataset again, for the DT pagination demo specifically.
+huge <- data.frame(
+  ID = seq_len(250),
+  Group = sample(
+    c("Control", "Treatment A", "Treatment B"),
+    250,
+    replace = TRUE
+  ),
+  Score = round(rnorm(250, 50, 10), 1)
+)
 ```
+
+
+::: {.callout-tip}
+# The Short Version
+- Use `flextable` for reasonably good HTML/docx/typst tables
+- Use `dt` where interactive data exploration is needed
+- Tables of more than one page break Typst rendering across packages
+- To get nice tables in docx, specify column widths manually
+- Never assume formatting that works with a small table will work on a big ugly one
+:::
 
 # Why this notebook exists
 
-NB: Word output is still corrupted as of this version.
+Tables are a pain — in Markdown, in HTML, in Word, in PDF, and
+especially across all three from one source document. The same table
+code does **not** produce equivalent output across formats; several
+packages fail outright on some targets rather than degrading gracefully.
+Notes below are from direct testing in this template, not general
+folklore — commands were actually run against `--to html`, `--to docx`,
+and `--to typst` while writing this.
 
-Tables are a pain. In general, in Markdown, in HTML, in Word, and especially in pandoc-generated .docx files.
+# The Riders & Runners
 
-The same table code does **not** produce equivalent output in HTML vs.
-docx — each package has a different HTML-vs-Word story. Notes below are
-from direct testing in this template.
-# `knitr::kable()`
+## Plain markdown tables
 
-`knitr::kable()`
+No R involved — pandoc's own table syntax, useful for small
+hand-written tables that don't need computed values. Two forms:
 
-- returns a markdown pipe table
-- no special formatting
-- supported by HTML (pretty) and Word (unstyled (?), not great)
+**Pipe table:**
+
+| Group     | Metric | Value |
+|-----------|--------|------:|
+| Control   | Alpha  |  9.83 |
+| Control   | Beta   | 11.20 |
+| Treatment | Alpha  | 10.55 |
+
+**Grid table** (supports multi-line/multi-paragraph cells, pipe tables
+don't):
+
++------------+-------------------------------------------------+
+| Group      | Notes                                           |
++============+=================================================+
+| Control    | Baseline arm.                                   |
+|            |                                                 |
+|            | No intervention applied.                        |
++------------+-------------------------------------------------+
+| Treatment  | Received the intervention starting week 2.      |
++------------+-------------------------------------------------+
+
+- ✅ Both render natively in html/docx/typst with no package involved —
+- same pandoc table writer as `kable()`'s output, so docx `Table` style caveat above still applies to these too.
+
+Grid tables are genuinely fragile to hand-write: the `+`/`|` characters
+must line up *exactly* by column position across every row. The first
+draft of the table above had one column one space too narrow in the
+header row — pandoc didn't error, it silently dropped the entire
+"Baseline arm." paragraph from the rendered output, with no warning.
+`knitr::kable(x, format = "grid")` looks like the obvious way to
+generate one instead of hand-aligning — it didn't work in the version
+tested here (`could not find function "kable_grid"`). Safest options:
+hand-align very carefully and check the rendered output, or just use a
+pipe table if multi-paragraph cells aren't actually needed.
+
+## `knitr::kable()`
+
+- Plain markdown/grid table, no package-specific styling.
+- ✅ Works everywhere (html/docx/typst) because it's just pandoc's own
+  table syntax — but with zero control over appearance. In docx it
+  renders using whatever the `Table` style resolves to in the reference
+  doc (see the README's `db-space-line-n.docx` notes).
 
 ```{r}
 #| label: tbl-kable
@@ -53,67 +174,89 @@ from direct testing in this template.
 kable(dat)
 ```
 
-# `kableExtra`
+## `kableExtra`
 
-- returns pretty HTML tables
-- supports Bootstrap
-- 🛑 crashes the docx render entirely
-
-::: {.content-visible when-format="docx"}
+- ✅ Pretty HTML via Bootstrap classes.
+- 🛑 **Hard-errors** the whole render for both docx and typst — not a
+  silent no-op. Confirmed with `kable_styling(bootstrap_options = ...)`
+  alone, no other package involved: `Functions that produce HTML output
+  found in document targeting docx output`. Same failure for typst.
+- Bootstrap styling has no docx/typst equivalent to fall back to, so
+  there's nothing sensible for it to degrade into anyway — gate it to
+  HTML rather than expecting a fallback.
 
 ```{r}
 #| label: tbl-kableextra
 #| tbl-cap: "kableExtra"
-#| eval: !expr knitr::is_html_output()
+#| eval: !expr is_html
 kable(dat) |>
   kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
   row_spec(0, bold = TRUE)
 ```
 
-*`kableExtra` output omitted here — see the note above.*
+::: {.content-visible unless-format="html"}
+*`kableExtra` output omitted here — HTML-only, see the note above.*
 :::
 
-# `gt`
+## `gt`
 
-- pretty HTML with colouring
-- 🛑 rendering to docx crashes the renderer (unless `webshot2` is installed, then returns static image)
-
-::: {.content-visible when-format="docx"}
+- ✅ Pretty HTML with conditional colouring.
+- 🛑 Hard-errors for **docx** (same "HTML output found" error as
+  kableExtra), *unless* the `webshot2` package is installed, in which
+  case it falls back to a static raster screenshot — not an editable
+  Word table.
+- ✅ Renders **natively to typst** — confirmed, no error, real vector
+  table (not a screenshot). This differs from docx and is easy to
+  assume incorrectly if you've only tested one non-HTML format.
 
 ```{r}
 #| label: tbl-gt
 #| tbl-cap: "gt"
-#| eval: !expr knitr::is_html_output()
+#| eval: !expr (is_html || is_typst)
 gt(dat) |>
   tab_header(title = "gt table") |>
   fmt_number(columns = c(Value, p), decimals = 2) |>
   data_color(columns = Value, palette = "viridis")
 ```
 
-*`gt` output omitted here — see the note above.*
+::: {.content-visible when-format="docx"}
+*`gt` output omitted here — see the note above (works for html/typst,
+not docx).*
 :::
 
-# `flextable`
+## `flextable`
 
-- generally pretty HTML (doesn't respect Quarto/CSS styles?) and .docx output
-- requires flextable Lua filter to be set in frontmatter (although it isn't here???)
-- targets the Word OOXML table model directly (via `officer`)
+- ✅✅✅ The most reliable cross-format option. Targets the Word OOXML table
+  model directly (via `officer`), and also renders cleanly to HTML and
+  typst — confirmed working in all three with no extra configuration.
+- No Lua filter needed in the YAML frontmatter for any of the three
+  formats tested here — Quarto's built-in `knit_print.flextable` /
+  print-method integration handles it automatically. (If you've seen
+  advice elsewhere about registering a flextable filter, it isn't
+  necessary for html/docx/typst as of the Quarto version this was
+  tested with.)
 
 ```{r}
 #| label: tbl-flextable
 #| tbl-cap: "flextable"
-# huxtable::bold() and flextable::bold() collide once both packages are
-# loaded — namespace explicitly rather than relying on load order.
+# huxtable and flextable both export bold()/width()/etc. with different
+# signatures — loading both means whichever loaded last wins by default.
+# Namespace explicitly rather than relying on load order (bit us during
+# testing: an unqualified width() call below picked up huxtable's version
+# and errored with "unused arguments").
 flextable(dat) |>
   theme_vanilla() |>
-  flextable::bold(part = "header") |> # namespace collision
+  flextable::bold(part = "header") |>
   autofit()
 ```
 
-# `huxtable`
+## `huxtable`
 
-- also pretty HTML (but not well spaced?) and .docx output
-- I've never used this before, but it looks fine?
+- ✅✅✅ Also genuinely cross-format (html/docx/typst) from one spec, smaller
+  styling vocabulary than flextable.
+- Quirk found in typst specifically: the table renders left-shifted
+  relative to `gt`/`flextable`'s centred output on the same page — check
+  it visually rather than assuming it matches your other tables in PDF.
 
 ```{r}
 #| label: tbl-huxtable
@@ -124,4 +267,119 @@ bottom_border(hux)[1, ] <- 1
 hux
 ```
 
-# Recommendation
+## `DT` (interactive, HTML only)
+
+- Not a static table — a paginated, sortable, filterable JS widget
+  (DataTables). This is the one to reach for when a table is too big to
+  dump on the page at once, rather than trying to force `kable`/`gt` to
+  cope with hundreds of rows.
+- HTML-only by nature (it's a JS widget) — same "HTML output" failure
+  as kableExtra/gt if you don't gate it for docx/typst.
+
+```{r}
+#| label: tbl-dt
+#| tbl-cap: "DT"
+#| eval: !expr is_html
+datatable(huge, options = list(pageLength = 10), filter = "top")
+```
+
+::: {.content-visible unless-format="html"}
+*`DT` output omitted here — it's an HTML/JS widget with no static
+docx/typst equivalent. `huge` has 250 rows; this is exactly the case
+where pagination beats a giant static table.*
+:::
+
+## Stress test: a big, ugly table
+
+30 rows, a `Notes` column with 1–3 sentences of variable-length text.
+Small toy tables hide exactly the problems that show up here — this is
+what actually surfaced the worst finding in this whole notebook, below.
+
+::: {.callout-warning}
+## Found while stress-testing: typst mangles tables that span a page break
+
+Render this notebook's PDF and look at the stress-test tables (`kable`,
+`flextable`, and `gt` — all three, not just one package): wherever the
+30-row table would break across a page boundary, the text becomes
+unreadable, interleaved character-soup for the rows around the break.
+Confirmed with raw text extraction (`pdftotext`), not just a PDF-viewer
+rendering glitch. It does not happen in HTML or docx — this is
+typst-specific, and it does not error or warn; the render "succeeds"
+with corrupted output.
+
+Reproduced with Quarto 1.9.36. Root cause looks like Quarto's
+markdown/pandoc-to-typst table writer not handling automatic
+page-breaking correctly once wrapped multi-line cell content is
+involved — small tables (the toy `dat` examples above) never hit this
+because they fit on one page.
+
+**If you're targeting typst/PDF: keep tables short enough to fit on one
+page**, or split a long table into page-sized chunks, or exclude it from
+the typst render entirely (gate with `eval: !expr !is_typst`, same
+pattern used elsewhere in this notebook) and point PDF readers at the
+HTML/docx version instead. Don't assume a clean `quarto render` with no
+errors means the PDF is actually correct — check it.
+:::
+
+**`kable`** — no width control at all. In docx this comes out as a
+plain grid table sized however Word feels like sizing it; long `Notes`
+text is not reliably wrapped in a readable way.
+
+```{r}
+#| label: tbl-big-kable
+#| tbl-cap: "Stress test: kable"
+kable(big)
+```
+
+**`flextable`** — same package as above, but here explicit column
+widths are set instead of `autofit()`. `autofit()` sizes every column to
+fit its content on one line, which for a long-text column means the
+table blows past the page width; fixed `width()` + flextable's automatic
+text wrapping (row height grows instead) is the fix.
+
+```{r}
+#| label: tbl-big-flextable
+#| tbl-cap: "Stress test: flextable with explicit column widths"
+flextable(big) |>
+  theme_vanilla() |>
+  flextable::bold(part = "header") |>
+  flextable::width(j = c("ID", "Group", "Score"), width = 0.8) |>
+  flextable::width(j = "Notes", width = 3.5) |>
+  flextable::fontsize(size = 9, part = "all")
+```
+
+**`gt`** (html/typst only) — no column-width fix applied here
+deliberately, so you can see the same overflow risk `kable` has when a
+text column isn't constrained.
+
+```{r}
+#| label: tbl-big-gt
+#| tbl-cap: "Stress test: gt"
+#| eval: !expr (is_html || is_typst)
+gt(big)
+```
+
+::: {.content-visible when-format="docx"}
+*`gt` output omitted here — see the `gt` section above.*
+:::
+
+**`DT`** (html only) — this is the actual answer to "the table is too
+big": don't fight a static format, paginate it.
+
+```{r}
+#| label: tbl-big-dt
+#| tbl-cap: "Stress test: DT"
+#| eval: !expr is_html
+datatable(big, options = list(pageLength = 5))
+```
+
+::: {.content-visible unless-format="html"}
+*`DT` output omitted here — HTML-only, see the note above.*
+:::
+
+**Takeaway:** docx handles a long table running across pages fine
+(native Word behaviour). typst does not — see the callout above, this
+is the real finding from stress-testing, not the column-width stuff.
+For HTML, don't use a static table package for anything much bigger
+than fits on one screen — use `DT`.
+
