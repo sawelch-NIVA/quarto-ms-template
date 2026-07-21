@@ -20,6 +20,7 @@ Write your introduction here, citing sources as needed [@example2024].
 #| label: setup
 #| include: false
 #| warning: false
+
 library(targets)
 library(here)
 here::i_am("manuscript/index.qmd")

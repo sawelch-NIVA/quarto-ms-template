@@ -104,6 +104,7 @@ list(
   tar_quarto(
     name = render_manuscript,
     path = "manuscript",
-    execute = TRUE # keep this unless you know you've just changed text, not code
+    execute = TRUE, # keep this unless you know you've just changed text, not code,
+    quiet = FALSE
   )
 )
