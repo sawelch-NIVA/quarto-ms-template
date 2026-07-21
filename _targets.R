@@ -28,9 +28,12 @@ tar_source()
 # construction code and package loads out of this file and out of every
 # other target's hands. tar_source() only picks up *.R, so it ignores the
 # .qmd partials living alongside them.
-tar_source("manuscript/tables")
-tar_source("manuscript/figures")
-
+suppressMessages(
+  {
+    tar_source("manuscript/tables")
+    tar_source("manuscript/figures")
+  }
+)
 # Replace the target list below with your own:
 # Target names are verbs describing the action each target performs - every
 # target is an action, not just the noun it produces (personal preference).
@@ -97,9 +100,10 @@ list(
   # automatically - confirmed this scan also follows {{< include >}}'d
   # partials (manuscript/tables/_tbl-01-example.qmd,
   # manuscript/figures/_fig-01-example.qmd), not just the top-level .qmd,
-  # so render_site correctly depends on tbl_01_example/fig_01_example too.
+  # so render_manuscript correctly depends on tbl_01_example/fig_01_example too.
   tar_quarto(
-    name = render_site,
-    path = "manuscript"
+    name = render_manuscript,
+    path = "manuscript",
+    execute = TRUE # keep this unless you know you've just changed text, not code
   )
 )

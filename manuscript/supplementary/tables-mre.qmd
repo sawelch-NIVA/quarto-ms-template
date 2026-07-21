@@ -22,17 +22,6 @@ library(flextable)
 library(huxtable)
 library(DT)
 
-# Tested directly in this template (not assumed from docs): which output
-# a package actually degrades to depends on the specific target format,
-# not just "HTML vs. not-HTML" — gt works for typst but not docx, for
-# example. Gate chunks on the real target rather than guessing.
-pandoc_to <- knitr::opts_knit$get("rmarkdown.pandoc.to")
-is_html <- identical(pandoc_to, "html")
-is_typst <- identical(pandoc_to, "typst")
-is_docx <- identical(pandoc_to, "docx")
-
-quarto_env <- Sys.getenv("QUARTO_EXECUTE_INFO")
-
 set.seed(1)
 dat <- data.frame(
   Group = rep(c("Control", "Treatment"), each = 3),
@@ -103,7 +92,21 @@ huge <- data.frame(
 Quarto render env is:
 
 ```{r}
-quarto_env
+#| label: get-render-environment
+library(jsonlite)
+
+info_file <- Sys.getenv("QUARTO_EXECUTE_INFO")
+info <- fromJSON(info_file)
+
+# Access document path
+info$`document-path`
+
+# Access format information
+render_format <- info$format$identifier$`target-format`
+
+is_html <- identical(render_format, "html")
+is_typst <- identical(render_format, "typst")
+is_docx <- identical(render_format, "docx")
 ```
 
 
