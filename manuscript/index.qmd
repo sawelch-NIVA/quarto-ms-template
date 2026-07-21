@@ -19,6 +19,7 @@ Write your introduction here, citing sources as needed [@example2024].
 ```{r}
 #| label: setup
 #| include: false
+#| warning: false
 library(targets)
 library(here)
 here::i_am("manuscript/index.qmd")
@@ -86,7 +87,10 @@ ext <- switch(
 
 if (!is.na(ext)) {
   for (f in si_files) {
-    title <- rmarkdown::yaml_front_matter(here("manuscript/supplementary", f))$title
+    title <- rmarkdown::yaml_front_matter(here(
+      "manuscript/supplementary",
+      f
+    ))$title
     base <- tools::file_path_sans_ext(f)
     cat(sprintf("- [%s](supplementary/%s.%s)\n", title, base, ext))
   }

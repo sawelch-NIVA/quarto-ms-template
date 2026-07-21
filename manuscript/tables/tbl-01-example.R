@@ -1,4 +1,4 @@
-# manuscript/tables/tbl-01-example.R ----
+# # manuscript/tables/tbl-01-example.R ----
 # Builds tbl-01-example. Standalone file so it's easy to open and tinker
 # with directly, and so this table's own styling packages don't have to be
 # loaded by every target in the pipeline. Sourced automatically by

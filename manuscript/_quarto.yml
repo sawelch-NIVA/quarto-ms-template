@@ -27,7 +27,6 @@ project:
 lang: en-GB
 
 website:
-  title: "Manuscript Title"
   sidebar:
     style: "docked"
     search: true
@@ -97,3 +96,6 @@ authors:
 
 comments:
   hypothesis: true # enables comments using a 3rd party service
+
+# filters execute (Lua) code on the rendered qmd before creating other formats (stupid name, imho)
+filters: [flextable-qmd]

@@ -60,7 +60,7 @@ list(
     name = fig_01_example,
     command = build_fig_01_example(simulate_data, calculate_model)
   ),
-  # Standalone submission exports — deliberately separate targets from
+  # # Standalone submission exports — deliberately separate targets from
   # render_site below, not chunks inside it: export_figures writes TIFFs,
   # and a TIFF anywhere in the tar_quarto() render would take html/docx down
   # with it if typst choked on it (see CLAUDE.md). Keeping export a sibling
@@ -90,7 +90,7 @@ list(
     ),
     format = "file"
   ),
-  # Renders the whole Quarto project rooted at manuscript/ (index.qmd,
+  # # Renders the whole Quarto project rooted at manuscript/ (index.qmd,
   # supplementary/*.qmd, ...) - a self-contained Quarto sub-project, see
   # manuscript/_quarto.yml. tarchetypes scans each .qmd for tar_read()/
   # tar_load() calls and wires up the matching target dependencies

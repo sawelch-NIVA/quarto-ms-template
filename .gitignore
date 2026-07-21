@@ -18,3 +18,4 @@
 !meta
 meta/*
 !meta/meta
+/.luarc.json

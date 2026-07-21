@@ -1,4 +1,4 @@
-<!-- manuscript/tables/_tbl-01-example.qmd ----
+<!-- # manuscript/tables/_tbl-01-example.qmd ----
      Include partial, not a page - leading underscore keeps Quarto's
      website-project renderer from also rendering this as its own site
      page (same convention as _quarto.yml/_freeze/_targets). Kept

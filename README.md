@@ -197,3 +197,5 @@ Optional and required extensions:
 Quarto Wingman: 
 - Superior Zotero citation from the Positron Quarto source editor
 - Lots of other stuff I haven't tried
+
+## Known Issues
