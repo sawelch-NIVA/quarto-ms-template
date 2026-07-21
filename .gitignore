@@ -6,7 +6,11 @@
 **/.quarto/
 **/*.quarto_ipynb
 
-/output/
+# Not root-anchored: output-dir must resolve inside manuscript/'s own
+# project directory (manuscript/output/), not the repo root - see
+# CLAUDE.md's "Directory layout" for why output-dir: ../output was a
+# genuinely broken configuration, not just relocated for tidiness.
+**/output/
 /submission/
 /_targets/
 /data/
@@ -19,3 +23,5 @@
 meta/*
 !meta/meta
 /.luarc.json
+**/figure-typst/*
+

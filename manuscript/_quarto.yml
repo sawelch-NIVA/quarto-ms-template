@@ -12,7 +12,22 @@
 
 project:
   type: website
-  output-dir: ../output # keeps rendered output at the repo root, not manuscript/output
+  # output-dir must stay INSIDE this project's own directory (manuscript/) -
+  # confirmed by direct testing that pointing it outside via output-dir:
+  # ../output is a genuinely broken configuration, not just an unusual one:
+  # Quarto warns "did not expect the path configuration being used in this
+  # project, and strange behavior may result" and "Refusing to remove
+  # directory ... since it is not a subdirectory of the main project
+  # directory", and in practice scattered rendered output across THREE
+  # places at once (a stray index_files/ at the repo root, a full render
+  # dropped directly in manuscript/, and the intended output/) instead of
+  # writing cleanly to one. This is the likely root cause of a recurring
+  # typst "file not found" bug for intermediate _files/ images and possibly
+  # the docx-corruption regression too - both are classic symptoms of
+  # Quarto's internal intermediate-file bookkeeping getting confused about
+  # where things belong. Output now lands in manuscript/output/, not
+  # output/ at the repo root - see CLAUDE.md/README.md's "Directory layout".
+  output-dir: output
   # Execute every .qmd's code with working directory = this project's own
   # root (manuscript/), not the file's own folder (Quarto's default).
   # Note this means tar_read()/tar_load() calls in index.qmd/supplementary/
@@ -50,7 +65,7 @@ website:
 
 format: 
   html:
-    css: styles.css
+    css: styles/styles.css
     theme: cosmo
     toc: true
     code-fold: true
@@ -59,7 +74,7 @@ format:
     monofont: "Fira Code"
     number-sections: true
     lightbox: true  # enable click-to-zoom images
-    # default HTML dimensions are a bit narrow for my taste (note that styles.css will override these)
+    # default HTML dimensions are a bit narrow (note that styles.css will override these)
     grid:
       sidebar-width: 250px
       body-width: 900px
@@ -82,7 +97,7 @@ fig-height: 4
 fig-dpi: 300
 
 execute:
-  freeze: auto # I think (but aren't sure) this conflicts with targets
+  freeze: false # I think (but aren't sure) this conflicts with targets
   echo: false # we might concievably want to echo source code in HTML, but for Word/PDF this is a sensible default
 
 

@@ -31,6 +31,8 @@ is_html <- identical(pandoc_to, "html")
 is_typst <- identical(pandoc_to, "typst")
 is_docx <- identical(pandoc_to, "docx")
 
+quarto_env <- Sys.getenv("QUARTO_EXECUTE_INFO")
+
 set.seed(1)
 dat <- data.frame(
   Group = rep(c("Control", "Treatment"), each = 3),
@@ -96,6 +98,12 @@ huge <- data.frame(
   ),
   Score = round(rnorm(250, 50, 10), 1)
 )
+```
+
+Quarto render env is:
+
+```{r}
+quarto_env
 ```
 
 

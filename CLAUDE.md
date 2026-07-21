@@ -54,21 +54,20 @@ _targets.R       pipeline: simulate_data → calculate_model → render_site (ta
 R/               functions, tar_source()'d automatically from _targets.R
 data-raw/        raw/as-received data + import scripts (tracked in git)
 data/            processed data from the pipeline (git-ignored, regenerated)
-output/          rendered output, all formats (git-ignored, rebuilt by tar_make()) —
-                 Quarto's website render deletes anything under here it doesn't
-                 recognize as its own, so nothing else is ever written here
 submission/      standalone per-table/per-figure exports for journals that need
                  individually named files (git-ignored, rebuilt by tar_make()) —
                  see "Standalone submission exports" below
 runme.R          one-time bootstrap: installs deps, makes folders, tar_make()
 generate-images.R  one-time generator for manuscript/img/ fixtures (root, not R/ — see Pipeline gotchas)
 manuscript/      a SELF-CONTAINED Quarto project, one level below the repo root —
-                 its own _quarto.yml, own _freeze/ and .quarto/ caches, isolated
-                 from everything else. Pattern borrowed from
+                 its own _quarto.yml, own _freeze/, .quarto/, and output/,
+                 isolated from everything else. Pattern borrowed from
                  https://github.com/kazuyanagimoto/quarto-research-blog. All of
                  the following live inside manuscript/:
-  _quarto.yml      project config: formats, theme, biblio/CSL, fig defaults,
-                   output-dir: ../output (renders land back at the repo root)
+  _quarto.yml      project config: formats, theme, biblio/CSL, fig defaults.
+                   output-dir MUST resolve inside manuscript/ (currently just
+                   `output`, i.e. manuscript/output/) — see the warning below,
+                   this isn't a style preference.
   index.qmd        the manuscript
   tables/          one build file (tbl-NN-slug.R) + include partial
                    (_tbl-NN-slug.qmd) per table — see "Standalone submission
@@ -78,27 +77,51 @@ manuscript/      a SELF-CONTAINED Quarto project, one level below the repo root 
   styles/          CSL file + Word reference docs (db-space-line-n.docx, standard.docx)
   img/             fixture images for supplementary/images-mre.qmd (tracked in git)
   references.bib   bibliography
+  output/          rendered output, all formats (git-ignored, rebuilt by
+                   tar_make()) — Quarto's website render deletes anything
+                   under here it doesn't recognize as its own, so nothing
+                   else is ever written here
 ```
 
 `data-raw/` vs `data/` mirrors the `usethis::use_data_raw()` R-package
 convention: raw input + cleaning scripts are tracked, derived output
 isn't.
 
-**Why `manuscript/` is isolated as its own nested Quarto project, not
-just a subfolder of files:** Quarto's freeze cache (`_freeze/`) and
-per-document intermediate artifacts (`*_files/`) are scoped to whatever
-project they're rendered under. A recurring bug (font-family warnings +
-`error: file not found ... tables-mre_files/figure-typst/tbl-flextable-1.png`
-on a typst render of `manuscript/supplementary/tables-mre.qmd`) traced back to stale/
-inconsistent `_freeze`+`_files` state — almost certainly the same root
-cause as the `freeze: true` staleness bug documented below, compounded by
-a direct `quarto render` invoked outside `tar_make()` for quick iteration
-(the CLAUDE.md-sanctioned exception), which writes its `_files` output
-next to wherever it's invoked from rather than into `output/`. Giving
+**`output-dir` must resolve INSIDE `manuscript/`'s own project directory —
+confirmed by direct testing that pointing it outside (e.g.
+`output-dir: ../output`, tried in an earlier version of this template to
+keep output at the repo root) is a genuinely broken configuration, not
+just unusual.** Quarto itself warns `did not expect the path configuration
+being used in this project, and strange behavior may result` and
+`Refusing to remove directory ... since it is not a subdirectory of the
+main project directory`, and in practice scattered rendered output across
+three different locations in one render (a stray `index_files/` at the
+repo root, a full duplicate render dropped directly in `manuscript/`, and
+the intended `output/`) instead of writing cleanly to one place. This was
+very likely the root cause of two separate-looking bugs at once: a
+recurring typst `file not found` error for intermediate `_files/` images,
+and a `manuscript/output/index.docx` that Word reported as corrupted and
+needing repair (isolated to the flextable-produced table by testing —
+commenting the table out stopped the repair prompt). After moving
+`output-dir` back inside `manuscript/`: a full clean rebuild reproduced
+correctly with output landing in exactly one place, and direct inspection
+of the docx's internal OOXML (`[Content_Types].xml`, `document.xml`,
+`_rels/document.xml.rels` — checked for XML well-formedness and that
+every `r:id`/`r:embed` reference resolves to an existing relationship
+target, since that's specifically what triggers Word's repair prompt)
+came back clean, with no missing relationship targets and no dangling
+references — Word itself wasn't available to confirm the repair prompt
+is gone (no Word/LibreOffice in this environment), so treat this as
+strong-but-not-visually-confirmed.
+
+**Why `manuscript/` is isolated as its own nested Quarto project in the
+first place, separate from the output-dir bug above:** Quarto's freeze
+cache (`_freeze/`) and per-document intermediate artifacts (`*_files/`)
+are scoped to whatever project they're rendered under. Giving
 `manuscript/` its own project root means its cache can never be
 cross-contaminated by anything else in the repo, and `rm -rf
-manuscript/_freeze manuscript/.quarto` is always a safe, complete "start
-fresh" — confirmed this fully cleared the bug on a full rebuild.
+manuscript/_freeze manuscript/.quarto manuscript/output` is always a
+safe, complete "start fresh."
 
 **Consequence of nesting `manuscript/` one level below the repo root:**
 the `_targets/` data store (defined by `_targets.R` at the repo root)
