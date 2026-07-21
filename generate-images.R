@@ -1,12 +1,13 @@
 # generate-images.R ----
-# One-time generator for the fixture images in img/, used by
-# supplementary/images-mre.qmd to stand in for "images created elsewhere and
-# loaded from a file" (as opposed to figures generated inline by an R
-# chunk). Run manually if these need regenerating; the outputs are committed
-# to git like any other fixture, not rebuilt by the targets pipeline. Lives
-# at the project root (not in R/) because tar_source() sources every .R file
-# under R/ on every pipeline load - a script with side effects like this one
-# does not belong there (see CLAUDE.md's runme.R note for the same reason).
+# One-time generator for the fixture images in manuscript/img/, used by
+# manuscript/supplementary/images-mre.qmd to stand in for "images created
+# elsewhere and loaded from a file" (as opposed to figures generated inline
+# by an R chunk). Run manually if these need regenerating; the outputs are
+# committed to git like any other fixture, not rebuilt by the targets
+# pipeline. Lives at the project root (not in R/) because tar_source()
+# sources every .R file under R/ on every pipeline load - a script with
+# side effects like this one does not belong there (see CLAUDE.md's
+# runme.R note for the same reason).
 #
 # Produces, at a deliberately large pixel size so format/legibility
 # differences actually show up when the images are scaled down to page width:
@@ -27,7 +28,7 @@ library(here)
 here::i_am("generate-images.R")
 
 set.seed(42)
-out_dir <- here("img")
+out_dir <- here("manuscript/img")
 
 # --- Raster content: a busy, high-resolution synthetic "micrograph" ----
 # Large canvas + fine text at several sizes + thin lines, so downscaling to

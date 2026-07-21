@@ -3,57 +3,33 @@
 # Then follow the manual to check and run the pipeline:
 #   https://books.ropensci.org/targets/walkthrough.html#inspect-the-pipeline
 
-# Load packages required to define the pipeline:
+# # Load packages required to define the pipeline:
 library(targets)
 library(tarchetypes) # tar_quarto() and friends
 library(here) # anchors file paths to the project root regardless of where
 # tar_make()/quarto render/knit is actually invoked from
 
-# Establishes the project root here() resolves to, independent of relying on
+# # Establishes the project root here() resolves to, independent of relying on
 # .git/.Rproj auto-detection - matters if this template is ever unzipped
 # rather than git-cloned.
 here::i_am("_targets.R")
 
 # Set target options:
 tar_option_set(
-  packages = c("tibble") # Packages that your targets need for their tasks.
-  # format = "qs", # Optionally set the default storage format. qs is fast.
-  #
-  # Pipelines that take a long time to run may benefit from
-  # optional distributed computing. To use this capability
-  # in tar_make(), supply a {crew} controller
-  # as discussed at https://books.ropensci.org/targets/crew.html.
-  # Choose a controller that suits your needs. For example, the following
-  # sets a controller that scales up to a maximum of two workers
-  # which run as local R processes. Each worker launches when there is work
-  # to do and exits if 60 seconds pass with no tasks to run.
-  #
-  #   controller = crew::crew_controller_local(workers = 2, seconds_idle = 60)
-  #
-  # Alternatively, if you want workers to run on a high-performance computing
-  # cluster, select a controller from the {crew.cluster} package.
-  # For the cloud, see plugin packages like {crew.aws.batch}.
-  # The following example is a controller for Sun Grid Engine (SGE).
-  #
-  #   controller = crew.cluster::crew_controller_sge(
-  #     # Number of workers that the pipeline can scale up to:
-  #     workers = 10,
-  #     # It is recommended to set an idle time so workers can shut themselves
-  #     # down if they are not running tasks.
-  #     seconds_idle = 120,
-  #     # Many clusters install R as an environment module, and you can load it
-  #     # with the script_lines argument. To select a specific verison of R,
-  #     # you may need to include a version string, e.g. "module load R/4.3.2".
-  #     # Check with your system administrator if you are unsure.
-  #     script_lines = "module load R"
-  #   )
-  #
-  # Set other options as needed.
+  packages = c("tibble"), # Packages that your targets need for their tasks.
+  format = "qs" # Optionally set the default storage format. qs is fast.
 )
 
-# Run the R scripts in the R/ folder with your custom functions:
+# # Source scripts in ~/R with custom functions:
 tar_source()
-# tar_source("other_functions.R") # Source other scripts as needed.
+# manuscript/tables/ and manuscript/figures/ hold one .R file per
+# table/figure (the build_*() function) plus a matching _*.qmd include
+# partial (see manuscript/index.qmd) - keeps each table/figure's
+# construction code and package loads out of this file and out of every
+# other target's hands. tar_source() only picks up *.R, so it ignores the
+# .qmd partials living alongside them.
+tar_source("manuscript/tables")
+tar_source("manuscript/figures")
 
 # Replace the target list below with your own:
 # Target names are verbs describing the action each target performs - every
@@ -62,18 +38,68 @@ list(
   tar_target(
     name = simulate_data,
     command = tibble(x = rnorm(100), y = rnorm(100))
-    # format = "qs" # Efficient storage for general data objects.
   ),
   tar_target(
     name = calculate_model,
     command = coefficients(lm(y ~ x, data = simulate_data))
   ),
-  # Renders the whole Quarto project (index.qmd, about.qmd, ...). tarchetypes
-  # scans each .qmd for tar_read()/tar_load() calls and wires up the matching
-  # target dependencies automatically (e.g. index.qmd's tar_read(calculate_model)
-  # makes this target depend on `calculate_model`).
+  # One target per table/figure, each just calling out to its own file
+  # (tables/tbl-01-example.R, figures/fig-01-example.R). Upstream targets
+  # (calculate_model, simulate_data) are passed in explicitly as arguments
+  # here, not referenced inside the sourced file - targets' dependency
+  # scanner only reads the command expression written in _targets.R, so a
+  # dependency used only inside the sourced file wouldn't be tracked.
+  # R object names use underscores (tbl_01_example); the journal's required
+  # filename (tbl-01-example.docx) uses hyphens - the two are related but
+  # not literally the same string anywhere in this pipeline.
+  tar_target(
+    name = tbl_01_example,
+    command = build_tbl_01_example(calculate_model)
+  ),
+  tar_target(
+    name = fig_01_example,
+    command = build_fig_01_example(simulate_data, calculate_model)
+  ),
+  # Standalone submission exports — deliberately separate targets from
+  # render_site below, not chunks inside it: export_figures writes TIFFs,
+  # and a TIFF anywhere in the tar_quarto() render would take html/docx down
+  # with it if typst choked on it (see CLAUDE.md). Keeping export a sibling
+  # target means that risk never touches the manuscript render at all.
+  # Written to submission/, NOT output/ - confirmed by direct testing that
+  # Quarto's website-project render deletes anything under output-dir it
+  # doesn't recognize as its own output (a whole subdirectory and an
+  # unrelated stray file both got silently wiped by a plain `quarto render`
+  # in this repo). output/ is Quarto's territory; submission/ isn't.
+  # One export target per table/figure - add a matching line here whenever
+  # a new tbl_NN_slug/fig_NN_slug target is added above.
+  tar_target(
+    name = export_tables,
+    command = export_table_docx(
+      tbl_01_example,
+      "tbl-01-example",
+      dir = here("submission")
+    ),
+    format = "file"
+  ),
+  tar_target(
+    name = export_figures,
+    command = export_figure_tiff(
+      fig_01_example,
+      "fig-01-example",
+      dir = here("submission")
+    ),
+    format = "file"
+  ),
+  # Renders the whole Quarto project rooted at manuscript/ (index.qmd,
+  # supplementary/*.qmd, ...) - a self-contained Quarto sub-project, see
+  # manuscript/_quarto.yml. tarchetypes scans each .qmd for tar_read()/
+  # tar_load() calls and wires up the matching target dependencies
+  # automatically - confirmed this scan also follows {{< include >}}'d
+  # partials (manuscript/tables/_tbl-01-example.qmd,
+  # manuscript/figures/_fig-01-example.qmd), not just the top-level .qmd,
+  # so render_site correctly depends on tbl_01_example/fig_01_example too.
   tar_quarto(
     name = render_site,
-    path = "."
+    path = "manuscript"
   )
 )

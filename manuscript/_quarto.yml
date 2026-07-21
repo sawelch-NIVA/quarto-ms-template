@@ -1,17 +1,30 @@
-# _quarto.yml ----
+# manuscript/_quarto.yml ----
 # Using the `website` project type rather than `manuscript` — manuscript
 # projects force a Jupyter engine/kernel even for pure-R content, which we
 # don't want here.
+#
+# This is a self-contained Quarto project rooted at manuscript/, one level
+# below the repo root - its own _freeze/, .quarto/, and (via output-dir
+# below) its own slice of the shared output/ folder, isolated from
+# anything else in the repo. Pattern borrowed from
+# https://github.com/kazuyanagimoto/quarto-research-blog. See
+# "Directory layout" in CLAUDE.md/README.md for the full picture.
 
 project:
   type: website
-  output-dir: output
-  # Execute every .qmd's code with working directory = project root, not
-  # the file's own folder (Quarto's default). Without this, tar_read()/
-  # tar_load() calls in supplementary/*.qmd can't find ../_targets since
-  # `targets` resolves the store relative to the R session's working
-  # directory, not via here() — confirmed by direct testing, see CLAUDE.md.
+  output-dir: ../output # keeps rendered output at the repo root, not manuscript/output
+  # Execute every .qmd's code with working directory = this project's own
+  # root (manuscript/), not the file's own folder (Quarto's default).
+  # Note this means tar_read()/tar_load() calls in index.qmd/supplementary/
+  # *.qmd/tables/figures partials can't find _targets/ via a plain
+  # tar_read(x) - that store lives at the repo root, one level up from
+  # here, not inside manuscript/. Pass store = here::here("_targets")
+  # explicitly to every tar_read()/tar_load() call instead of relying on
+  # cwd - confirmed by direct testing this is genuinely required, not
+  # just defensive.
   execute-dir: project
+
+lang: en-GB
 
 website:
   title: "Manuscript Title"
@@ -43,9 +56,17 @@ format:
     toc: true
     code-fold: true
     code-overflow: wrap
+    mainfont: "Fira Sans"
     monofont: "Fira Code"
+    number-sections: true
+    lightbox: true  # enable click-to-zoom images
+    # default HTML dimensions are a bit narrow for my taste (note that styles.css will override these)
     grid:
-      sidebar-width: 400px # reduce sidebar width to give main content more room to breathe
+      sidebar-width: 250px
+      body-width: 900px
+      margin-width: 300px
+    citeproc: true # needed?
+
 
   docx:
     # reference-doc: styles/standard.docx         # bog standard word formatting
@@ -62,7 +83,7 @@ fig-height: 4
 fig-dpi: 300
 
 execute:
-  freeze: true # I think (but aren't sure) this conflicts with targets
+  freeze: auto # I think (but aren't sure) this conflicts with targets
   echo: false # we might concievably want to echo source code in HTML, but for Word/PDF this is a sensible default
 
 

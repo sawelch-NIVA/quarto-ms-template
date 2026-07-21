@@ -1,0 +1,11 @@
+<!-- manuscript/figures/_fig-01-example.qmd ----
+     Include partial, not a page - see tables/_tbl-01-example.qmd for why
+     the leading underscore matters, why this file is kept thin, and why
+     the explicit store= below is needed. -->
+
+```{r}
+#| label: fig-01-example
+#| fig-cap: "Example figure generated from the pipeline."
+library(ggplot2)
+targets::tar_read(fig_01_example, store = here::here("_targets"))
+```

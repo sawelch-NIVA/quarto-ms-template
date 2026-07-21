@@ -35,14 +35,19 @@ library(here)
 # i_am()'s argument is THIS file's own path relative to the project root -
 # not _targets.R's path. Anchors here() to the root regardless of where this
 # notebook gets knit from.
-i_am("supplementary/notebook-template.qmd")
+i_am("manuscript/supplementary/notebook-template.qmd")
 ```
 
 By default code chunk output to the console is rendered as is (straight onto a white background in HTML, although it gets a grey background in Word and PDF). It looks pretty bad. You also can't reference it.
 
 ```{r}
 #| label: explore
-data <- tar_read(simulate_data)
+# store= is required here, not optional: manuscript/_quarto.yml's
+# execute-dir: project means R code runs with cwd = manuscript/ (the
+# nested Quarto project's own root), but the _targets/ store itself lives
+# at the repo root next to _targets.R - tar_read()'s default store lookup
+# is cwd-relative, not here()-anchored, so it wouldn't find it otherwise.
+data <- tar_read(simulate_data, store = here("_targets"))
 head(data)
 ```
 

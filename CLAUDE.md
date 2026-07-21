@@ -17,13 +17,13 @@ without re-litigating that.
 
 **Always render via `targets::tar_make()`, never `quarto render`
 directly**, except for quick iteration on a single file while writing it.
-`index.qmd` and any notebook using `tar_read()`/`tar_load()` depends on
-the `_targets/` data store; a direct render can silently pick up stale
-or missing data. Every `.qmd` has a YAML-comment reminder of this.
-`_targets.R` has one `tar_quarto(name = render_site, path = ".")` target
-that renders the whole project (all formats) as the pipeline's last step —
-confirmed this single target produces html+docx+typst together, no need
-for per-format targets.
+`manuscript/index.qmd` and any notebook using `tar_read()`/`tar_load()`
+depends on the `_targets/` data store; a direct render can silently pick
+up stale or missing data. Every `.qmd` has a YAML-comment reminder of
+this. `_targets.R` has one `tar_quarto(name = render_site, path =
+"manuscript")` target that renders the whole `manuscript/` project (all
+formats) as the pipeline's last step — confirmed this single target
+produces html+docx+typst together, no need for per-format targets.
 
 ## Conventions
 
@@ -38,29 +38,79 @@ for per-format targets.
   resolution identical regardless of whether something is run via
   `tar_make()`, knit standalone from an editor, or `Rscript`'d from an
   arbitrary directory. `i_am()`'s argument is always the *calling* file's
-  own path relative to the project root — not the path of whatever it's
-  trying to reach (easy to get backwards).
+  own path relative to the **repo root** (where `.git`/`_targets.R`
+  live) — not the file's path relative to `manuscript/`, and not the path
+  of whatever it's trying to reach (easy to get backwards). E.g.
+  `manuscript/index.qmd` calls `here::i_am("manuscript/index.qmd")`, not
+  `here::i_am("index.qmd")`.
+- **`tar_read()`/`tar_load()` calls anywhere under `manuscript/` need an
+  explicit `store = here::here("_targets")` argument** — see "Directory
+  layout" below for why this is required, not defensive styling.
 
-## Structure
+## Directory layout
 
 ```
-_targets.R       pipeline: simulate_data → calculate_model → render_site (tar_quarto, renders everything)
-_quarto.yml      project config: formats, theme, biblio/CSL, fig defaults
+_targets.R       pipeline: simulate_data → calculate_model → render_site (tar_quarto, renders manuscript/)
 R/               functions, tar_source()'d automatically from _targets.R
 data-raw/        raw/as-received data + import scripts (tracked in git)
 data/            processed data from the pipeline (git-ignored, regenerated)
-img/             fixture images for supplementary/images-mre.qmd (tracked in git)
-index.qmd        the manuscript
-supplementary/   extra notebooks (rendered automatically, not auto-linked in nav)
-styles/          CSL file + Word reference docs (db-space-line-n.docx, standard.docx)
-output/          rendered output, all formats (git-ignored, rebuilt by tar_make())
+output/          rendered output, all formats (git-ignored, rebuilt by tar_make()) —
+                 Quarto's website render deletes anything under here it doesn't
+                 recognize as its own, so nothing else is ever written here
+submission/      standalone per-table/per-figure exports for journals that need
+                 individually named files (git-ignored, rebuilt by tar_make()) —
+                 see "Standalone submission exports" below
 runme.R          one-time bootstrap: installs deps, makes folders, tar_make()
-generate-images.R  one-time generator for img/ fixtures (root, not R/ — see Pipeline gotchas)
+generate-images.R  one-time generator for manuscript/img/ fixtures (root, not R/ — see Pipeline gotchas)
+manuscript/      a SELF-CONTAINED Quarto project, one level below the repo root —
+                 its own _quarto.yml, own _freeze/ and .quarto/ caches, isolated
+                 from everything else. Pattern borrowed from
+                 https://github.com/kazuyanagimoto/quarto-research-blog. All of
+                 the following live inside manuscript/:
+  _quarto.yml      project config: formats, theme, biblio/CSL, fig defaults,
+                   output-dir: ../output (renders land back at the repo root)
+  index.qmd        the manuscript
+  tables/          one build file (tbl-NN-slug.R) + include partial
+                   (_tbl-NN-slug.qmd) per table — see "Standalone submission
+                   exports" below
+  figures/         same pattern as tables/, one pair of files per figure
+  supplementary/   extra notebooks (rendered automatically, not auto-linked in nav)
+  styles/          CSL file + Word reference docs (db-space-line-n.docx, standard.docx)
+  img/             fixture images for supplementary/images-mre.qmd (tracked in git)
+  references.bib   bibliography
 ```
 
 `data-raw/` vs `data/` mirrors the `usethis::use_data_raw()` R-package
 convention: raw input + cleaning scripts are tracked, derived output
 isn't.
+
+**Why `manuscript/` is isolated as its own nested Quarto project, not
+just a subfolder of files:** Quarto's freeze cache (`_freeze/`) and
+per-document intermediate artifacts (`*_files/`) are scoped to whatever
+project they're rendered under. A recurring bug (font-family warnings +
+`error: file not found ... tables-mre_files/figure-typst/tbl-flextable-1.png`
+on a typst render of `manuscript/supplementary/tables-mre.qmd`) traced back to stale/
+inconsistent `_freeze`+`_files` state — almost certainly the same root
+cause as the `freeze: true` staleness bug documented below, compounded by
+a direct `quarto render` invoked outside `tar_make()` for quick iteration
+(the CLAUDE.md-sanctioned exception), which writes its `_files` output
+next to wherever it's invoked from rather than into `output/`. Giving
+`manuscript/` its own project root means its cache can never be
+cross-contaminated by anything else in the repo, and `rm -rf
+manuscript/_freeze manuscript/.quarto` is always a safe, complete "start
+fresh" — confirmed this fully cleared the bug on a full rebuild.
+
+**Consequence of nesting `manuscript/` one level below the repo root:**
+the `_targets/` data store (defined by `_targets.R` at the repo root)
+is *not* inside `manuscript/`'s own project root. With
+`execute-dir: project` in `manuscript/_quarto.yml`, R code inside
+`manuscript/**/*.qmd` runs with cwd = `manuscript/`, and `tar_read()`'s
+default store lookup is cwd-relative (not `here()`-anchored) — so a bare
+`tar_read(x)` inside `manuscript/` would look for `manuscript/_targets/`
+and fail to find it. Fix used throughout `manuscript/`: pass
+`store = here::here("_targets")` explicitly to every `tar_read()`/
+`tar_load()` call — confirmed by direct testing this is genuinely
+required, not just defensive.
 
 ## Confirmed by direct testing, not assumed
 
@@ -94,7 +144,7 @@ it's very likely the root cause of inconsistent table formatting in
 Word. Fix: define styles with these exact names in Word (no import
 needed, name-matching is all pandoc uses).
 
-### R table packages (`supplementary/tables-mre.qmd`)
+### R table packages (`manuscript/supplementary/tables-mre.qmd`)
 Full writeup lives in the notebook; headline findings:
 
 - **`kableExtra` and `gt` hard-error** a docx or typst render if not
@@ -133,7 +183,7 @@ Full writeup lives in the notebook; headline findings:
   is correct. Mitigation: keep typst-bound tables short enough to fit on
   one page, or exclude large tables from the typst target.
 
-### Images & diagrams (`supplementary/images-mre.qmd`)
+### Images & diagrams (`manuscript/supplementary/images-mre.qmd`)
 Full writeup lives in the notebook; headline findings:
 
 - **Mermaid diagrams (```` ```{mermaid} ````) work natively across
@@ -186,6 +236,93 @@ Full writeup lives in the notebook; headline findings:
   run setup first) is what determines success. Don't chase this as a
   real error; check the final `✔ render_site completed` / exit code
   instead.
+- **Quarto's website render deletes anything under `output-dir` it doesn't
+  recognize as its own output** — confirmed by direct testing: a stray file
+  and an entire unrelated subdirectory placed directly under `output/`
+  were both silently gone after a plain `quarto render . --to html`, no
+  warning. Consequential part: any pipeline step that writes files into
+  `output/` outside of `tar_quarto()` itself (e.g. an export step that
+  runs before `render_site` in a given `tar_make()`) can have its output
+  wiped by the same `tar_make()` invocation that created it, and whether
+  that happens depends on target execution order, not something visible
+  from reading `_targets.R`. Fix used here: anything that isn't a
+  `tar_quarto()` output goes in a sibling directory (`submission/`) that
+  Quarto never touches, never inside `output/`.
+
+### Standalone submission exports
+Some journals require every table/figure as its own individually named
+file (`tbl-01-slug.docx`, `fig-01-slug.tif`), not just embedded in the
+manuscript. Each table/figure gets its own build file —
+`manuscript/tables/tbl-01-example.R` / `manuscript/figures/fig-01-example.R`,
+defining a `build_*()` function — kept deliberately separate from
+`_targets.R` so each one can load whatever styling packages it personally
+needs (e.g. `patchwork`, `ggrepel`) without those becoming pipeline-wide
+dependencies, and so the construction code itself is a normal,
+directly-runnable R script rather than an expression buried inside a
+`tar_target()` call. `_targets.R` wires each in as its own target
+(`tbl_01_example`, `fig_01_example`), passing upstream targets (e.g.
+`calculate_model`) in explicitly as function arguments — targets'
+dependency scanner only reads the literal `command =` expression in
+`_targets.R`, so a dependency used only *inside* the sourced file
+wouldn't be tracked otherwise.
+
+Embedding into the manuscript goes through a thin include partial per
+table/figure — `manuscript/tables/_tbl-01-example.qmd` /
+`manuscript/figures/_fig-01-example.qmd` — pulled into
+`manuscript/index.qmd` via `{{< include >}}`. The leading underscore
+matters: it's the standard Quarto convention (same idea as `_quarto.yml`,
+`_freeze`, `_targets`) that keeps the website-project renderer from also
+rendering these partials as their own standalone pages. Confirmed by
+direct testing that `tarchetypes::tar_quarto()`'s automatic dependency
+scan follows `tar_read()` calls inside an `{{< include >}}`'d partial, not
+just the top-level `.qmd` — changing `manuscript/figures/fig-01-example.R`
+correctly triggered `render_site` to rerun with no manual
+`tar_invalidate()` needed.
+
+`export_tables`/`export_figures` write the *same* built object to a
+standalone file in `submission/`, via `flextable::save_as_docx()` / a
+PNG→TIFF `magick` conversion in `R/functions.R` — one definition per
+table/figure, packaged twice, not a second render pass. `export_figures`
+renders to PNG first and converts with `magick` rather than using
+`ggsave(device = "tiff")` directly, mirroring `generate-images.R`'s
+approach, since LZW support in the `tiff` graphics device isn't consistent
+across platforms.
+
+**Gotcha confirmed by direct testing: an include partial needs its own
+`library(pkg)` call for whatever it prints, even though the object itself
+was already built (with that package loaded) inside the targets
+pipeline.** Without `library(flextable)` in
+`manuscript/tables/_tbl-01-example.qmd`, the table rendered in both html
+and docx as a dumped R object structure (`$header`, `$dataset`,
+`$content`, raw `fpstruct`/`complex_tabpart` internals as literal text)
+instead of an actual table — `targets::tar_read()`
+happily deserializes a flextable-classed object either way, but S3 print
+dispatch inside the Quarto/knitr render session silently falls back to
+`print.default()` if the printing package's namespace was never loaded in
+*that* session. Not obviously wrong from a normal render (no error, no
+warning — it "renders" and looks plausible until you actually read the
+table). Each include partial should `library()` whatever package owns the
+print method for the object it's pulling in, don't assume it's loaded.
+
+**Related, separate gotcha confirmed by direct testing:
+`execute: freeze: true` can serve stale rendered content for a document
+indefinitely, regardless of source changes.** Confirmed (under the old
+pre-`manuscript/` layout, when `_quarto.yml`/`index.qmd` were still at the
+repo root): `_freeze/index/execute-results/html.json` sat untouched through several
+`tar_make()` runs that each reported `render_site completed`, while the
+actual rendered `output/index.html` kept showing old chunk labels/content.
+`freeze: true` means *always* reuse the frozen result once one exists, not
+"reuse if the source hasn't changed" (that's `freeze: auto`) — so editing
+the qmd or anything it depends on has no visible effect until the relevant
+`_freeze/<doc>/` subfolder is deleted (or `tar_invalidate(render_site)` +
+deleting it) to force re-execution. `manuscript/_quarto.yml` now uses
+`freeze: auto`, which re-executes when the source is newer than the
+freeze cache — the setting itself was changed by the user after this was
+flagged, not by a Claude session. A second, likely-related instance of
+this same staleness surfaced later as a recurring typst bug in
+`manuscript/supplementary/tables-mre.qmd` (font warnings + a hard `file
+not found` error for a `_files/` image that should have existed) — see
+"Why `manuscript/` is isolated" above.
 
 ## Known drift to watch for
 

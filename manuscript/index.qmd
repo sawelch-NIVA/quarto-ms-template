@@ -21,7 +21,7 @@ Write your introduction here, citing sources as needed [@example2024].
 #| include: false
 library(targets)
 library(here)
-here::i_am("index.qmd")
+here::i_am("manuscript/index.qmd")
 ```
 
 # Methods
@@ -36,27 +36,26 @@ $$ {#eq-poisson}
 
 You can refer back to sections [@sec-intro] We had to put `{#sec-intro}` after "Introduction" in the header above.
 
-This is a figure @fig-example.
+This is a figure @fig-01-example.
 
-```{r}
-#| label: fig-example
-#| fig-cap: "Example figure generated from the pipeline. In general, figures should always have captions"
-data <- tar_read(simulate_data)
-model <- tar_read(calculate_model)
-plot(data$x, data$y)
-abline(model)
-```
+{{< include figures/_fig-01-example.qmd >}}
 
-This is a table @tbl-example. For some reason, they use different caption variables.
+This is a table @tbl-01-example. For some reason, they use different caption variables.
 
-```{r}
-#| label: tbl-example
-#| tbl-cap: "Example figure generated from the pipeline. In general, figures should always have captions"
-data <- tar_read(simulate_data)
-model <- tar_read(calculate_model)
-plot(data$x, data$y)
-abline(model)
-```
+{{< include tables/_tbl-01-example.qmd >}}
+
+::: {.callout-note}
+Each table/figure has its own build file (`tables/tbl-01-example.R`,
+`figures/fig-01-example.R` - own packages, own styling code, nothing
+shared) and its own thin include partial (`tables/_tbl-01-example.qmd`,
+`figures/_fig-01-example.qmd`) that pulls the built object in here via an
+include shortcode. The `export_tables`/`export_figures` targets in
+`_targets.R` write the *same* built object to a standalone docx/TIFF in
+`submission/` (not `output/` — Quarto's website render deletes anything
+under `output/` it doesn't recognize as its own, confirmed by direct
+testing), so the embedded version above and the standalone submission file
+are never two different definitions of the same table/figure.
+:::
 
 
 ::: {.content-hidden when-format="html"}
@@ -74,7 +73,7 @@ Because notebooks, etc. are provided via the sidebar, they don't show up in HTML
 # content). Docx/typst output only: this whole block is hidden for html
 # (the sidebar nav covers it there), and `ext` below only knows how to
 # build links for the two non-html formats.
-si_files <- list.files(here("supplementary"), pattern = "\\.qmd$")
+si_files <- list.files(here("manuscript/supplementary"), pattern = "\\.qmd$")
 si_files <- sort(setdiff(si_files, "notebook-template.qmd"))
 
 # TODO: Doesn't work when we run in an int. session as knitr option returns null. worth fixing?
@@ -87,7 +86,7 @@ ext <- switch(
 
 if (!is.na(ext)) {
   for (f in si_files) {
-    title <- rmarkdown::yaml_front_matter(here("supplementary", f))$title
+    title <- rmarkdown::yaml_front_matter(here("manuscript/supplementary", f))$title
     base <- tools::file_path_sans_ext(f)
     cat(sprintf("- [%s](supplementary/%s.%s)\n", title, base, ext))
   }

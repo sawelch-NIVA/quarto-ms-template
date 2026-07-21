@@ -3,13 +3,17 @@
 .RData
 .Ruserdata
 
-/.quarto/
+**/.quarto/
 **/*.quarto_ipynb
 
 /output/
+/submission/
 /_targets/
 /data/
-_freeze/*
+# Not root-anchored: manuscript/ is its own nested Quarto project with its
+# own _freeze/ cache, one level down from the repo root - see CLAUDE.md's
+# "Directory layout".
+**/_freeze/*
 
 !meta
 meta/*

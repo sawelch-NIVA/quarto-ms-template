@@ -17,7 +17,7 @@ title: "Images & diagrams in Quarto: mermaid, ggplot, and files"
 #| include: false
 library(ggplot2)
 library(here)
-here::i_am("supplementary/images-mre.qmd")
+here::i_am("manuscript/supplementary/images-mre.qmd")
 
 set.seed(1)
 ```
