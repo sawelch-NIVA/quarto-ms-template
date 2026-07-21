@@ -23,5 +23,7 @@
 meta/*
 !meta/meta
 /.luarc.json
+# Typst will occasionally (Flextable behaviour?) generate temporary
+# directories with intermediate images in them.
 **/figure-typst/*
 

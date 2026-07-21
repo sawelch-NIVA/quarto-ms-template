@@ -213,7 +213,14 @@ Quarto Wingman:
 
 ## Known Issues
 
-Setting freeze: auto in quarto.yml tends to result in the rendering process creating intermediate files in the wrong place, which it then can't find. You'll get errors that look like this when run via `_targets.R`.
+### `output-dir` escaping the project directory
+
+An earlier version of this template pointed `manuscript/_quarto.yml`'s
+`output-dir` outside `manuscript/` (`../output`) to keep rendered output at
+the repo root. Quarto accepts that YAML without complaint but doesn't
+actually support it, and the rendering process ends up creating
+intermediate files in the wrong place, which it then can't find. You'll
+get errors that look like this when run via `_targets.R`.
 
 ```r
 + render_site dispatched                                    
@@ -252,4 +259,48 @@ WARN: Quarto did not expect the path configuration being used in this project, a
 ERROR: Typst compilation failed
 ```
 
-The fix is to make sure that `freeze: false` is set in `_quarto.yml`, and delete any leftover intermediate files in root (e.g. `index_files`).
+The actual fix is to keep `output-dir` inside `manuscript/` (it's just
+`output` now, not `../output` — see "Directory layout" above), not a
+`freeze` setting. Whatever the immediate symptom, delete any leftover
+intermediate files (`index_files/`, `*_files/`, stray `index.docx`/
+`index.html`/`index.typ` sitting next to source `.qmd` files) before
+re-rendering — a half-written scratch folder from an earlier failed or
+interrupted render is itself enough to cause the next render to fail with
+a confusing "file not found" error, independent of what caused the
+original failure.
+
+### Stale `PATH` / multiple R or Quarto installations
+
+A single `tar_make()` run can involve **three separately-resolved R/Quarto
+processes**, not one:
+
+1. Whatever R actually ran `targets::tar_make()` (console, `Rscript`,
+   Positron's R session).
+2. `quarto.exe` itself — not R at all, found on `PATH` (or wherever the
+   `quarto` R package's own detection logic points), invoked as a
+   subprocess by `tar_quarto()`/`tarchetypes`.
+3. The R that `quarto` *itself* spawns to execute a `.qmd`'s knitr chunks
+   — also `PATH`-resolved, and not guaranteed to be the same R as #1.
+
+None of these three re-read `PATH` from a running session — a shell,
+Positron R console, or coding-assistant terminal that was already open
+when you changed `PATH` (e.g. installed a new R version) keeps resolving
+whatever it originally saw, even after a reboot, if that specific process
+wasn't actually closed and reopened. Confirmed directly: after removing an
+old R install and updating `PATH`, an already-running shell kept
+resolving the now-deleted `Rscript.exe` and failed with `Rscript: command
+not found`, while a fresh process using the full path to the same R
+install worked fine. This is also a likely contributor to orphaned
+intermediate/temp files turning up in unexpected places (a render started
+under one R/Quarto resolution, interrupted or mismatched partway through)
+— see the `output-dir` issue above.
+
+If something works in one session/terminal but not another with
+seemingly identical code: check what's actually being resolved *in the
+session having trouble* rather than assuming —
+`Sys.which("R")`/`Sys.which("Rscript")`/`Sys.which("quarto")` in R, or
+`where.exe Rscript`/`where.exe quarto` in a terminal. After changing an R
+or Quarto install, fully close and reopen every terminal/IDE window
+(a "reload window" in an IDE doesn't necessarily restart every background
+process it spawned, e.g. a language server or persistent R session) —
+don't assume a reboot alone refreshed every already-running process.

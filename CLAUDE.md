@@ -271,6 +271,35 @@ Full writeup lives in the notebook; headline findings:
   from reading `_targets.R`. Fix used here: anything that isn't a
   `tar_quarto()` output goes in a sibling directory (`submission/`) that
   Quarto never touches, never inside `output/`.
+- **A single `tar_make()` run involves three separately-resolved R/Quarto
+  processes, not one, and none of them re-read `PATH` from an
+  already-running session.** (1) whatever R actually ran
+  `targets::tar_make()`; (2) `quarto.exe` itself — not R, found on `PATH`,
+  invoked as a subprocess by `tar_quarto()`; (3) the R that `quarto`
+  spawns to execute the `.qmd`'s knitr chunks — also `PATH`-resolved, not
+  guaranteed to be the same R as (1). A shell, Positron R console, or
+  coding-assistant terminal that was already open when `PATH` changed
+  (e.g. a new R version installed) keeps resolving whatever it originally
+  saw, even after a reboot, if that specific process itself wasn't closed
+  and reopened. Confirmed directly: after removing an old R install and
+  updating `PATH`, an already-running shell (including a Claude Code
+  session's own persistent shell) kept resolving the now-deleted
+  `Rscript.exe` and failed with `Rscript: command not found`, while a
+  fresh process using the full path to the same install worked fine. This
+  is a likely contributor to orphaned intermediate/temp files turning up
+  in unexpected places, too (a render started or interrupted under one
+  R/Quarto resolution while another part of the toolchain used a
+  different one) — compounds the `output-dir` issue above rather than
+  being fully separate from it. When something works in one
+  session/terminal but not another with apparently identical code: check
+  what's actually being resolved *in the session having trouble*
+  (`Sys.which("R")`/`Sys.which("Rscript")`/`Sys.which("quarto")`, or
+  `where.exe Rscript`/`where.exe quarto`) rather than assuming — don't
+  trust "it's on PATH" without checking the live value in that specific
+  process. After changing an R or Quarto install, fully close and reopen
+  every terminal/IDE window; a "reload window" doesn't necessarily
+  restart every background process an IDE spawned (language server,
+  persistent R session), so it can still serve a stale environment.
 
 ### Standalone submission exports
 Some journals require every table/figure as its own individually named
