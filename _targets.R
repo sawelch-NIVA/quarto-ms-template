@@ -105,6 +105,6 @@ list(
     name = render_manuscript,
     path = "manuscript",
     execute = TRUE, # keep this unless you know you've just changed text, not code,
-    quiet = FALSE
+    quiet = TRUE # set to true to get better logs if anything fails
   )
 )

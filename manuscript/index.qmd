@@ -26,6 +26,26 @@ library(here)
 here::i_am("manuscript/index.qmd")
 ```
 
+```{r}
+#| label: get-render-environment
+#| include: false
+
+library(jsonlite)
+
+info_file <- Sys.getenv("QUARTO_EXECUTE_INFO")
+info <- fromJSON(info_file)
+
+# Access document path
+info$`document-path`
+
+# Access format information
+render_format <- info$format$identifier$`target-format`
+
+is_html <- identical(render_format, "html")
+is_typst <- identical(render_format, "typst")
+is_docx <- identical(render_format, "docx")
+```
+
 # Methods
 
 We can add full-line equations with `\$\$` and reference them [@eq-poisson]. This uses... LatEX? Mathjax? Note that inline code fences don't get any special styling in Word. 
