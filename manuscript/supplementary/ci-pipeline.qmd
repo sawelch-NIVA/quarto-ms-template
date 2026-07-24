@@ -35,6 +35,10 @@ here::i_am("manuscript/supplementary/ci-pipeline.qmd")
   partial `output/` (some formats rendered, one didn't) is itself the
   useful debugging signal for the "one bad format blocks the others"
   gotcha documented in CLAUDE.md.
+- **A real first run hung for ~3 hours at `render_manuscript` and had to
+  be cancelled by hand** - see "A real CI failure" below. `timeout-minutes:
+  15` now caps that, and an explicit `quarto install chrome-headless-shell`
+  step is a hypothesis fix for the actual cause, not yet confirmed working.
 :::
 
 # Why this notebook exists
@@ -57,11 +61,12 @@ flowchart TD
     A[push / pull_request] --> B["checkout"]
     B --> C["setup-r + setup-r-dependencies<br/>(installs R packages + Ubuntu sysreqs)"]
     C --> D["quarto-actions/setup<br/>(installs Quarto CLI)"]
-    D --> E["apt-get install librsvg2-bin"]
-    E --> F["testthat::test_dir()"]
-    F --> G["source data-raw/import-data.R"]
-    G --> H["targets::tar_make()"]
-    H --> I["upload manuscript/output/ as an artifact"]
+    D --> E["quarto install chrome-headless-shell"]
+    E --> F["apt-get install librsvg2-bin"]
+    F --> G["testthat::test_dir()"]
+    G --> H["source data-raw/import-data.R"]
+    H --> I["targets::tar_make()"]
+    I --> J["upload manuscript/output/ as an artifact"]
 ```
 
 Each step, and why it's there:
@@ -77,28 +82,75 @@ Each step, and why it's there:
    separately from R. Pandoc and the typst compiler both come bundled with
    Quarto (see [rendering-pipeline.qmd](rendering-pipeline.qmd)), so no
    further install is needed for either.
-4. **`librsvg2-bin`** - closes the SVG→docx gap documented in
+4. **`quarto install chrome-headless-shell`** - added after a real CI hang;
+   see "A real CI failure" below for why this exists and what's actually
+   confirmed about it.
+5. **`librsvg2-bin`** - closes the SVG→docx gap documented in
    [images-mre.qmd](images-mre.qmd): without `rsvg-convert` on `PATH`,
    pandoc embeds a raw SVG in docx with no raster fallback. This
    development environment never had it installed, so that gap was always
    "unverified-risky" locally; CI is the first place it's actually closed.
-5. **`testthat::test_dir("tests/testthat", stop_on_failure = TRUE)`** -
+6. **`testthat::test_dir("tests/testthat", stop_on_failure = TRUE)`** -
    runs before the pipeline build, so a broken `detect_render_format()` or
    export helper fails fast with a clear test name instead of surfacing as
    a confusing render error further down. See
    [testing-mre.qmd](testing-mre.qmd) for the test setup itself.
-6. **`source("data-raw/import-data.R")`** - a fresh runner has no
+7. **`source("data-raw/import-data.R")`** - a fresh runner has no
    `data/` folder (git-ignored), so the pipeline's `import_data` target has
    nothing to read until this runs once. Mirrors what `runme.R` does for a
    first-time local setup (see
    [`data-raw/data-raw-readme.md`](../../data-raw/data-raw-readme.md)).
-7. **`targets::tar_make()`** - builds every target and renders `manuscript/`
+8. **`targets::tar_make()`** - builds every target and renders `manuscript/`
    in all three formats, exactly as it would locally.
-8. **`actions/upload-artifact`**, with `if: always()` - runs even if
+9. **`actions/upload-artifact`**, with `if: always()` - runs even if
    `tar_make()` fails partway through, so a partial `manuscript/output/`
    (e.g. html/docx present, typst missing after a hard failure) is
    downloadable from the workflow run for debugging, not just a red X with
    no further detail.
+
+# A real CI failure
+
+The first actual run of this workflow did not behave like the local
+testing that motivated it. Tests passed (14/14), `import-data.R` ran, and
+`tar_make()` progressed cleanly through `example_data_file`, `import_data`,
+`calculate_model`, `fig_01_example`, `tbl_01_example`, and
+`export_figures` - then hung at `render_manuscript dispatched` for
+**~3 hours** before someone cancelled it by hand. GitHub Actions' default
+job timeout is 6 hours, so nothing would have stopped it on its own.
+
+The workflow's own cleanup log named the culprit: orphaned `chrome`,
+`chrome_crashpad_handler`, and `deno` processes, terminated only because
+the job was cancelled. `render_manuscript` is the one step that renders
+`manuscript/`'s mermaid diagrams
+([images-mre.qmd](images-mre.qmd), [rendering-pipeline.qmd](rendering-pipeline.qmd))
+to PNG for docx/typst, and Quarto does that via a Deno-managed headless
+Chrome - confirmed real (not a guess) by running
+`quarto install chrome-headless-shell` directly in this session: it's a
+genuine, separate ~115MB download, distinct from the Quarto CLI itself.
+Locally (Windows), that download/launch had apparently already happened
+transparently and fast on some earlier run and was never noticed as a
+distinct step; on a fresh Ubuntu runner with nothing cached, it's the
+most likely thing to hang - either a slow/stuck download, or a launch
+failure specific to the runner's environment (headless Chrome commonly
+needs system libraries or sandbox flags a minimal image may not have).
+
+**What was done about it, and what's still unconfirmed:**
+
+- `timeout-minutes: 15` on the job (local renders take ~4 minutes) - this
+  part is certain: whatever happens next, it can't silently run for hours
+  again.
+- An explicit `quarto install chrome-headless-shell --no-prompt` step
+  before the render, so this exact download happens as its own named,
+  visible step (with output and a bounded time budget) instead of lazily
+  triggering deep inside `tar_make()` with no separate log to read. This
+  is a **hypothesis fix, not a confirmed one** - the download itself was
+  tested and works, but whether pre-installing it this way actually avoids
+  whatever specifically hung in the real CI run hasn't been observed. If
+  the next run still hangs or fails at this step (or still at
+  `render_manuscript`), that's the next thing to dig into - likely missing
+  system libraries for headless Chrome on this exact runner image, which
+  would need identifying from that run's own log rather than guessed at
+  here.
 
 # What this doesn't do
 
@@ -111,14 +163,15 @@ package list and lockfile would be the next thing to add - not done here
 to keep this workflow's failure modes easy to reason about while the
 template is still this new.
 
-**Not independently confirmed in this session:** the pipeline steps above
-were run and verified locally (`tar_make()` completing all eight targets,
-correct pipeline output), but the actual GitHub Actions execution of this
-exact workflow - runner provisioning, `setup-r-dependencies`' sysreqs
-resolution on a real Ubuntu runner, whether every package installs cleanly
-in that environment - hasn't been observed running in CI itself. Push this
-and check the Actions tab before trusting it fully; treat the workflow as
-"should work" rather than "confirmed working," unlike most of the other
-findings in this template's notebooks.
+**Where this actually stands:** the real CI run above confirms
+`setup-r-dependencies`' package/sysreqs resolution, the test step, and
+`import-data.R` all work on a genuine Ubuntu runner - that part is no
+longer a guess. `render_manuscript` specifically is not yet confirmed
+working in CI; the `chrome-headless-shell` pre-install is this session's
+best-supported hypothesis for why it hung, tested only to the extent that
+the download itself works, not that it fixes the hang. Push again and
+check the Actions tab before trusting the full pipeline; treat
+`render_manuscript` in CI as "should work now" rather than "confirmed
+working."
 
 # References

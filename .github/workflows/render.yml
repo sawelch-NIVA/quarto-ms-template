@@ -15,6 +15,11 @@ on:
 jobs:
   render:
     runs-on: ubuntu-latest
+    # Local renders finish in ~4 minutes; GitHub's default job timeout is
+    # 6 hours, which is how a hung headless-Chrome mermaid render burned
+    # ~3 hours before someone noticed and cancelled it manually. Fail fast
+    # instead - see manuscript/supplementary/ci-pipeline.qmd.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -49,6 +54,27 @@ jobs:
             withr
 
       - uses: quarto-dev/quarto-actions/setup@v2
+
+      # Hypothesis fix, not yet confirmed in actual CI: a real run hung
+      # for ~3h at render_manuscript and was cancelled manually, with
+      # orphaned chrome/chrome_crashpad_handler/deno processes left behind
+      # at cleanup. Quarto renders this repo's mermaid diagrams
+      # (images-mre.qmd, rendering-pipeline.qmd) to PNG for docx/typst via
+      # a Deno-managed "chrome-headless-shell" (confirmed as a real,
+      # separate ~115MB download via `quarto install chrome-headless-shell`,
+      # tested directly in this session - "chromium" is the older, legacy
+      # target name), downloaded/launched lazily on first use - that
+      # almost certainly hung mid-render rather than failing cleanly.
+      # Pre-installing it here, as its own visible step with output and
+      # (via timeout-minutes above) a hard time limit, should surface a
+      # download/launch problem quickly instead of silently stalling
+      # render_manuscript for hours. See
+      # manuscript/supplementary/ci-pipeline.qmd for the full writeup - the
+      # download itself was confirmed to work in this session, but NOT
+      # whether this actually fixes the CI hang; the next CI run is what
+      # tests that part.
+      - name: Install Quarto's headless Chrome (mermaid → docx/typst)
+        run: quarto install chrome-headless-shell --no-prompt
 
       # Closes the one documented-but-unverified-locally gap: without
       # rsvg-convert, docx SVG embedding has no raster fallback (see
