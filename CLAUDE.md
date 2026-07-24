@@ -510,6 +510,38 @@ Full writeup lives in the notebook; headline findings:
   and pulls prebuilt RSPM binaries, which plain `install.packages()`
   does neither of — pointing CI at `runme.R` would trade "missing R
   package" for "fails to compile from source," a worse failure mode.
+  **A second, related incident surfaced right after the first was
+  fixed**: `setup-r-dependencies`'s own default (`dependencies: "all"`)
+  resolves `Suggests` too, not just `Imports`/`Depends`/`LinkingTo` -
+  `install.packages()` never touches `Suggests`, so this gap is
+  invisible locally for the same underlying reason as the first
+  incident. It broke when `tidygraph` (a direct entry in
+  `required_pkgs`, for `diagrams-mre.qmd`) got its full `Suggests` list
+  resolved, which includes `NetSwan` - archived from CRAN on 2025-01-26
+  (confirmed by reading `tidygraph`'s own installed `DESCRIPTION`
+  directly, not assumed). `pak`'s lockfile solver treats one
+  unresolvable package anywhere in the requested set as a failure for
+  the *whole* lockfile - the CI error listed "dependency conflict"
+  against every single package, not just the one that was actually
+  broken, which is worth knowing before assuming a long list of
+  simultaneous "dependency conflict" errors means anything is wrong with
+  most of those packages. **Fix**: `dependencies: '"hard"'` on the
+  `setup-r-dependencies` step, restricting pak to
+  `Imports`/`Depends`/`LinkingTo` only - matches `install.packages()`'s
+  own behaviour and structurally can't reach `NetSwan` again. **Not
+  independently reproduced end-to-end locally, and confirmed why not**:
+  a local `pak::lockfile_create(dependencies = "all")` against this
+  project's actual package list *succeeded* - `pak::repo_status()`
+  showed local resolving against a plain CRAN-type repo (source-capable,
+  still serves packages from CRAN's `Archive/`), while CI's
+  `use-public-rspm: true` serves binary-only snapshots that don't mirror
+  archived packages. Same nominal request, genuinely different outcome
+  depending on which repo backend answers it - "it resolved on my
+  machine" isn't evidence it'll resolve in CI for an archived-package
+  case like this one. Same family of bug as the PATH-resolution finding
+  further down this list (different processes/environments silently
+  disagreeing), different mechanism (package repository contents, not
+  `PATH`).
 - `tarchetypes::tar_quarto()`'s dependency-scanning pass evaluates chunk
   options like `eval: !expr is_html` without running the setup chunk
   first, printing a harmless `Error in eval(x, envir = envir) : object

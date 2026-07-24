@@ -64,9 +64,41 @@ jobs:
       # does neither, so pointing CI at runme.R directly would trade
       # "missing R package" for "fails to compile from source because the
       # system lib isn't there" - a worse failure mode, not a fix.
+      #
+      # dependencies: '"hard"' - a second, real incident, not defensive
+      # styling: this action's own default ("all") resolves Suggests too,
+      # not just Imports/Depends/LinkingTo - install.packages() (what
+      # runme.R and local testing use) never touches Suggests, so this
+      # gap is invisible locally the same way the missing-package
+      # incident above was. It surfaced when `tidygraph` (a direct
+      # dependency here, for diagrams-mre.qmd) was resolved with its full
+      # Suggests list, which includes `NetSwan` - archived from CRAN on
+      # 2025-01-26 (confirmed: `tidygraph`'s own installed DESCRIPTION
+      # lists it under Suggests), and pak's *lockfile* solver treats one
+      # unresolvable package anywhere in the requested set as a hard
+      # failure for the whole lockfile, not just that one package - the
+      # CI error listed "dependency conflict" against every package in
+      # the list, not just tidygraph/NetSwan. `dependencies: '"hard"'`
+      # restricts pak to Imports/Depends/LinkingTo only, matching
+      # install.packages()'s own behaviour and confirmed (by inspecting
+      # tidygraph's DESCRIPTION directly) to never reach NetSwan at all.
+      # **Not independently reproduced end-to-end locally** - a local
+      # `pak::lockfile_create(dependencies = "all")` against this
+      # project's required package list actually succeeded, because local
+      # resolves against plain CRAN (source-capable, still serves
+      # archived packages from CRAN's Archive/), while CI's
+      # `use-public-rspm: true` above serves binary-only snapshots that
+      # don't mirror archived packages - confirmed via `pak::repo_status()`
+      # showing a plain "cran"-type repo locally, not RSPM. Same nominal
+      # request, genuinely different outcome depending on which repo
+      # backend answers it - "it resolved on my machine" isn't evidence
+      # it'll resolve in CI for an archived-package case like this one,
+      # same spirit as (but a different mechanism from) the PATH-based
+      # process-mismatch gotcha elsewhere in this file/CLAUDE.md.
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           packages: ${{ steps.required-packages.outputs.list }}
+          dependencies: '"hard"'
 
       - uses: quarto-dev/quarto-actions/setup@v2
 
