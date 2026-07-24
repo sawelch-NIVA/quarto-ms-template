@@ -69,6 +69,12 @@ website:
             - href: supplementary\tables-mre.qmd
               text: "Rendering Tables in Quarto"
               icon: journal-code
+            - href: supplementary\plots-mre.qmd
+              text: "ggplot2: Themes, Markdown, patchwork"
+              icon: journal-code
+            - href: supplementary\fonts-mre.qmd
+              text: "Fonts in ggplot2"
+              icon: journal-code
             - href: supplementary\ci-pipeline.qmd
               text: "Continuous Integration"
               icon: journal-code
@@ -91,7 +97,7 @@ format:
     # default HTML dimensions are a bit narrow (note that styles.css will override these)
     grid:
       sidebar-width: 250px
-      body-width: 900px
+      body-width: 700px
       margin-width: 300px
     citeproc: true # needed?
 
@@ -120,6 +126,18 @@ csl: styles/apa.csl # other styles at https://github.com/citation-style-language
 fig-width: 6
 fig-height: 4
 fig-dpi: 300
+
+# ragg_png over the base R png() device - confirmed by direct testing
+# (see manuscript/supplementary/fonts-mre.qmd) that base png() uses
+# Windows' legacy GDI font lookup and warns "font family not found in
+# Windows font database" for fonts a systemfonts-aware device (ragg,
+# svglite) resolves without complaint - this is what actually caused the
+# warning seen rendering flextable::gen_grob() output. ragg is also the
+# only device confirmed here to render a font registered from an
+# arbitrary local file (not just system-installed fonts) correctly.
+knitr:
+  opts_chunk:
+    dev: "ragg_png"
 
 execute:
   freeze: false # I think (but aren't sure) this conflicts with targets

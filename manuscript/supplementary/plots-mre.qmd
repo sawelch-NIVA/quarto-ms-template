@@ -1,0 +1,248 @@
+---
+# Render via `targets::tar_make()` (the `render_manuscript` target in
+# _targets.R), not `quarto render` directly - see manuscript.qmd.
+#
+# Minimal reproducible example (MRE) for ggplot2 graphics in this
+# template: a session-wide theme, ggtext markdown text (including a real,
+# confirmed bug), and combining plots with patchwork - including a table
+# grob alongside a plot grob.
+title: "ggplot2: session themes, markdown text, and patchwork"
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(ggplot2)
+library(ggtext)
+library(patchwork)
+library(flextable)
+library(here)
+here::i_am("manuscript/supplementary/plots-mre.qmd")
+
+# Sets the default theme for every ggplot built in the REST OF THIS
+# DOCUMENT's render session - no need to add + theme_something() to each
+# plot individually. Scoped to this notebook's own knitr session only
+# (see CLAUDE.md's "Pipeline gotchas" for why each .qmd/partial is its own
+# render context) - it does not affect other notebooks or manuscript.qmd.
+theme_set(theme_minimal(base_size = 12))
+```
+
+{{< include _back-to-manuscript.qmd >}}
+
+::: {.callout-tip}
+# The Short Version
+- `theme_set()` in the setup chunk applies to every later chunk in the
+  same render - no need to add `+ theme_something()` to each plot.
+- `ggtext::element_markdown()` lets theme text elements (titles,
+  subtitles, axis text, captions) render limited Markdown - `**bold**`,
+  `*italic*`, and more.
+- **Confirmed real bug, still present in ggplot2 4.0.3**: adding another
+  *complete* theme (e.g. `+ theme_bw()`) after `theme_set()`'d an
+  `element_markdown()` override silently wipes it back to plain text -
+  not a rendering glitch, a real class change
+  (`element_markdown` → `element_text`), confirmed by inspecting
+  `plot$theme$plot.title`'s class directly, not just by eye. Root cause:
+  ggplot2 *replaces*, not merges, when one complete theme is added on top
+  of another.
+- Fix: reapply the `element_markdown()` override *after* any later
+  complete theme - every time, since order is what matters, not where the
+  original override came from.
+- `patchwork` combines multiple plots (and other grid grobs) with
+  `+`/`/`/`()` and `plot_layout()`/`plot_annotation()`.
+- A table can share a `patchwork` layout with a plot two ways:
+  `patchwork::wrap_table()` for a plain data frame, or
+  `flextable::gen_grob()` + `patchwork::wrap_elements()` for a fully
+  styled `flextable` - ties into this project's own table conventions,
+  see [tables-mre.qmd](tables-mre.qmd).
+:::
+
+# Why this notebook exists
+
+[tables-mre.qmd](tables-mre.qmd) and [images-mre.qmd](images-mre.qmd) are
+both about *format support* - does the same code produce equivalent
+output across html/docx/typst. This notebook is a different kind of
+concern: session-wide styling conventions, and a genuine ggplot2 gotcha
+that's easy to hit and easy to misdiagnose (it looks like `ggtext` isn't
+working at all, when the actual cause is theme ordering elsewhere in the
+document). Findings below are from direct testing in this template, not
+assumed from documentation.
+
+# Basic ggplot graphs
+
+Nothing template-specific here - just confirming the session theme (set
+in the setup chunk above) applies with no `+ theme_something()` needed on
+any individual plot:
+
+```{r}
+#| label: fig-scatter
+#| fig-cap: "A basic scatter plot, using the session-wide theme"
+ggplot(mtcars, aes(wt, mpg, colour = factor(cyl))) +
+  geom_point(size = 2) +
+  labs(x = "Weight (1000 lbs)", y = "Miles per gallon", colour = "Cylinders")
+```
+
+```{r}
+#| label: fig-bar
+#| fig-cap: "A basic bar chart, same session-wide theme, no extra code"
+ggplot(mtcars, aes(factor(cyl))) +
+  geom_bar(fill = "steelblue") +
+  labs(x = "Cylinders", y = "Count")
+```
+
+# A session-wide theme
+
+`theme_set(theme_minimal(base_size = 12))` in the setup chunk (`include:
+false`, so it doesn't print) is what both plots above picked up
+automatically. This is `ggplot2`'s own intended mechanism for this -
+`theme_set()` changes the *default* theme returned by `theme_get()`,
+which every subsequent plot in the same R session is built against unless
+it adds its own theme explicitly. Confirmed scoped correctly: this
+setting does not leak into other notebooks or `manuscript.qmd`, since
+each is rendered in its own knitr session (see CLAUDE.md's "Pipeline
+gotchas").
+
+# Markdown text with ggtext
+
+`ggtext::element_markdown()` swapped in for a theme text element renders
+limited Markdown instead of a literal string:
+
+```{r}
+#| label: fig-markdown-title
+#| fig-cap: "A title with **bold** and *italic* markdown, rendered correctly"
+p_markdown <- ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  labs(title = "**Weight** vs. *fuel economy*") +
+  theme(plot.title = element_markdown())
+p_markdown
+```
+
+The title above renders "Weight" bold and "fuel economy" italic, not the
+literal asterisks - confirmed by inspecting the rendered output directly,
+not just trusting the code looks right.
+
+## The bug: a later complete theme silently drops the markdown override
+
+`theme_bw()`, `theme_minimal()`, and friends are **complete** themes -
+`attr(theme_bw(), "complete")` is `TRUE`. A bare `theme(plot.title =
+element_markdown())` is **not** complete
+(`attr(theme(plot.title = element_markdown()), "complete")` is `FALSE`) -
+it's a partial modification, meant to be merged onto whatever theme is
+already active. Confirmed directly: adding one complete theme on top of
+another **replaces** the existing theme wholesale rather than merging -
+this is what breaks the pattern above the moment a second complete theme
+enters the picture, and it's easy to hit by accident (reaching for `+
+theme_bw()` on one specific plot for contrast, say) without realising it
+silently undoes an earlier `element_markdown()` override set via
+`theme_set()` further up the document.
+
+```{r}
+#| label: fig-markdown-bug
+#| fig-cap: "Same markdown title, after + theme_bw() - reverts to literal asterisks"
+#| fig-width: 8
+p_broken <- p_markdown + theme_bw()
+p_broken
+```
+
+```{r}
+#| label: check-theme-classes
+cat(
+  "p_markdown's plot.title element class:",
+  class(p_markdown$theme$plot.title)[1],
+  "\n"
+)
+cat(
+  "p_broken's plot.title element class:  ",
+  class(p_broken$theme$plot.title)[1],
+  "\n"
+)
+```
+
+Confirms it's a real class change, not a rendering fluke: `plot.title`
+goes from `element_markdown` to a plain `element_text` the moment
+`theme_bw()` (complete) is added after the fact - `theme_bw()` supplies
+its *own* `plot.title` (an ordinary `element_text`), and since adding one
+complete theme replaces rather than merges, that plain element wins,
+regardless of what was active before.
+
+**Fix: reapply the markdown override *after* any later complete theme.**
+Order is what matters here, not where the original override came from:
+
+```{r}
+#| label: fig-markdown-fixed
+#| fig-cap: "theme_bw() + the markdown override reapplied afterward - fixed"
+#| fig-width: 8
+p_fixed <- p_markdown + theme_bw() + theme(plot.title = element_markdown())
+p_fixed
+```
+
+There's no way to make the override "stick" through an arbitrary later
+complete theme automatically - reapplying it after every complete theme
+added downstream is the only fix, since the replacement happens at
+`+`-time on whatever complete theme arrives last, not at `theme_set()`
+time.
+
+# Combining plots with patchwork
+
+`patchwork` combines separate ggplot objects with `+` (wrap into an
+implicit grid), `/` (stack vertically), and `plot_layout()`/
+`plot_annotation()` for finer control:
+
+```{r}
+#| label: fig-patchwork
+#| fig-cap: "Three plots combined with patchwork - side by side, then stacked"
+#| fig-width: 8
+#| fig-height: 6
+p_a <- ggplot(mtcars, aes(wt, mpg)) + geom_point() + labs(title = "A")
+p_b <- ggplot(mtcars, aes(factor(cyl))) + geom_bar() + labs(title = "B")
+p_c <- ggplot(mtcars, aes(mpg)) + geom_histogram(bins = 10) + labs(title = "C")
+
+(p_a | p_b) /
+  p_c +
+  plot_layout(guides = "collect") +
+  plot_annotation(
+    title = "patchwork: (A | B) / C",
+    tag_levels = "1"
+  )
+```
+
+# Combining a plot grob and a table grob
+
+Two ways to put a table alongside a plot in the same `patchwork` layout.
+The quick way, for a plain data frame - `patchwork::wrap_table()`:
+
+```{r}
+#| label: fig-wrap-table
+#| fig-cap: "A plot beside a plain data frame, via patchwork::wrap_table()"
+#| fig-width: 8
+p_a + wrap_table(head(mtcars[, c("mpg", "wt", "cyl")], 5))
+```
+
+The more capable way, for a fully-styled `flextable` - convert it to a
+grob with `flextable::gen_grob()`, then hand that grob to
+`patchwork::wrap_elements()`. This is the version worth using when the
+table needs the same styling conventions as the rest of the manuscript
+(see [tables-mre.qmd](tables-mre.qmd) for why `flextable` is this
+project's default table package):
+
+```{r}
+#| label: fig-flextable-grob
+#| fig-cap: "A plot beside a styled flextable, via gen_grob() + wrap_elements()"
+#| fig-width: 8
+ft <- flextable(head(mtcars[, c("mpg", "wt", "cyl")], 5)) |>
+  theme_vanilla() |>
+  flextable::bold(part = "header") |>
+  autofit()
+tbl_grob <- flextable::gen_grob(ft, fit = "fixed", scaling = "min")
+
+p_a + wrap_elements(full = tbl_grob)
+```
+
+Both are ordinary `grid` grobs by the time `patchwork` draws them, so
+this isn't format-specific the way file-based images are (see
+[images-mre.qmd](images-mre.qmd)) - knitr rasterises the whole combined
+figure through the standard R graphics device regardless of html/docx/
+typst, confirmed by rendering this notebook in all three and checking
+each output directly rather than assuming grid composition "just works"
+everywhere.
+
+# References

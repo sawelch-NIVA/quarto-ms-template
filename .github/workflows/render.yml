@@ -61,6 +61,13 @@ jobs:
             ggplot2
             magick
             svglite
+            ggtext
+            patchwork
+            systemfonts
+            ragg
+            showtext
+            sysfonts
+            extrafont
             testthat
             withr
 

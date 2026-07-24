@@ -1,0 +1,321 @@
+---
+# Render via `targets::tar_make()` (the `render_manuscript` target in
+# _targets.R), not `quarto render` directly - see manuscript.qmd.
+#
+# Minimal reproducible example (MRE) for fonts in ggplot2 figures
+# specifically - not the document-level fonts (html mainfont/monofont,
+# the docx reference-doc, typst mainfont) already covered in CLAUDE.md,
+# which is a completely separate mechanism from what this notebook is
+# about.
+title: "Fonts in ggplot2: web fonts, local files, and three renderers"
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(ggplot2)
+library(here)
+here::i_am("manuscript/supplementary/fonts-mre.qmd")
+```
+
+{{< include _back-to-manuscript.qmd >}}
+
+::: {.callout-tip}
+# The Short Version
+- **Two entirely separate font systems, easy to conflate**: document-level
+  fonts (html `mainfont`, the docx reference-doc, typst `mainfont` -
+  already in CLAUDE.md) govern prose. Figure-level fonts - what this
+  notebook covers - are resolved by whatever R graphics device drew the
+  plot, a completely different mechanism.
+- **A reproducibility gap confirmed hiding in plain sight**: Fira
+  Sans/Fira Code (used throughout this project) are installed on this
+  development machine, confirmed via `systemfonts::system_fonts()` - but
+  nothing in this repo installs them anywhere. Nothing has broken *yet*
+  only because of what happens to already be on this one machine.
+- **`systemfonts::register_font()` + `ragg::agg_png()` is the recommended
+  combination** - confirmed to correctly render a font registered from an
+  arbitrary local *file*, not just a system-installed font. This is the
+  realistic case for a future brand font: a licensed file someone hands
+  you, not a Google Fonts catalog entry.
+- **`showtext` + `sysfonts::font_add_google()` works for remote web
+  fonts, but has a confirmed real footgun**: `showtext_opts(dpi = )` must
+  match the actual device DPI, or text renders at the wrong size relative
+  to the rest of the plot - confirmed by rendering the identical plot both
+  ways.
+- **`svglite` handles registered fonts differently, confirmed by
+  inspecting the raw SVG**: it references the font by its own internal
+  name, not whatever alias you registered it under, and does not embed
+  it - unlike a raster PNG, the SVG isn't self-contained.
+- **`extrafont` is confirmed a poor fit for this project**:
+  `font_import()` only scans system font directories and hard-errors
+  (not just "finds nothing") when asked about a font that lives anywhere
+  else - exactly the local-file case this project actually needs.
+- **Root-caused the warning from `plots-mre.qmd`**: `font family not
+  found in Windows font database` is the *base* `png()` device's own
+  legacy Windows GDI font lookup failing - confirmed by reproducing it
+  with `png()` and watching it vanish with `ragg::agg_png()`. Fixed
+  project-wide: `manuscript/_quarto.yml` now sets `knitr: opts_chunk:
+  dev: "ragg_png"`.
+:::
+
+# Why this notebook exists
+
+[plots-mre.qmd](plots-mre.qmd) hit a real warning
+(`font family not found in Windows font database`) while combining a
+`flextable` grob with a plot. That warning turned out to be a small
+symptom of a much bigger question: fonts in ggplot2 figures are resolved
+by a completely different mechanism than the document-level fonts
+CLAUDE.md already covers, several competing R packages exist to manage
+them, each with its own eccentricities, and more than one graphics device
+might end up rendering any given figure. Findings below are from direct
+testing in this template - every claim here was actually reproduced, not
+assumed from a package's own documentation.
+
+# Two font systems, not one
+
+**Document-level fonts** (html `mainfont`/`monofont`, the docx
+reference-doc's theme font, typst `mainfont` - see CLAUDE.md) govern
+prose: headings, body text, captions. Pandoc/typst/Word resolve these
+themselves, at the document level, once per render.
+
+**Figure-level fonts** are different: a `ggplot2` figure is rendered to a
+PNG/SVG by an R *graphics device* before pandoc ever sees it, and that
+device has to resolve any font name used inside the plot (via `theme()`,
+`element_text(family = ...)`, etc.) on its own. A plot's embedded text has
+already been turned into pixels or vector paths by the time pandoc
+touches the document - nothing about `mainfont`/`monofont` reaches inside
+a figure. This is why "the document renders in the right font, but the
+plot's own title doesn't" is a completely different problem from anything
+already documented, and needs its own fix.
+
+# The reproducibility gap hiding in plain sight
+
+```{r}
+#| label: check-installed-fonts
+library(systemfonts)
+fonts <- system_fonts()
+cat("Fira Sans installed on this machine:", any(grepl("Fira Sans", fonts$family)), "\n")
+cat("Fira Code installed on this machine:", any(grepl("Fira Code", fonts$family)), "\n")
+```
+
+Both are installed here - confirmed above, not assumed - which is exactly
+why using `family = "Fira Sans"` inside a `ggplot2` theme has never
+visibly broken during this project's local development. But nothing in
+`runme.R`, `_targets.R`, or `.github/workflows/render.yml` installs these
+fonts anywhere. A fresh Ubuntu CI runner or a new contributor's machine
+has no reason to have them either - the only reason this hasn't already
+surfaced as a visible bug is that no figure in this project's actual
+manuscript currently sets an explicit font family. The moment one does,
+whether it renders correctly becomes a matter of luck about whose machine
+it's rendered on, not something this repository guarantees.
+
+# Registering a local font file: systemfonts + ragg
+
+The realistic scenario for a future brand font isn't "add a Google Fonts
+entry" - it's "someone hands you a licensed `.otf`/`.ttf` file." A fixture
+font (`manuscript/fonts/SpaceMono-Regular.ttf`, generated once by
+[`generate-fonts.R`](../generate-fonts.R) and committed to git, the same
+pattern `generate-images.R` uses) stands in for that case here - chosen
+because it's visually distinctive (a geometric monospace) and confirmed
+**not** preinstalled on this machine, so a correct render actually proves
+registration worked rather than accidentally matching a font that was
+there anyway.
+
+```{r}
+#| label: fig-local-font-file
+#| fig-cap: "A font registered from an arbitrary local file, not a system font"
+register_font(
+  name = "Space Mono Local",
+  plain = here("manuscript/fonts/SpaceMono-Regular.ttf")
+)
+
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  labs(title = "Space Mono, registered from a local file") +
+  theme_minimal(base_family = "Space Mono Local")
+```
+
+No system-wide font install, no admin rights, no OS-specific step - just
+a file path. This is confirmed to work with `ragg::agg_png()` (this
+project's default figure device, see below) as of `systemfonts` 1.3.2 and
+`ragg` 1.5.2.
+
+# Remote web fonts: showtext + sysfonts::font_add_google()
+
+`sysfonts::font_add_google()` fetches a font directly from Google's live
+API - genuinely useful for "I just want a Google Font, no file to manage
+myself," but it's a real network dependency at render time, unlike the
+committed fixture file above. `showtext_auto()` then makes `showtext`
+intercept all subsequent text drawing for the rest of this session -
+turned back off further down once the point's made.
+
+```{r}
+#| label: fig-showtext-google-font
+#| fig-cap: "A live Google Font (Space Mono again, fetched remotely this time) via showtext"
+library(sysfonts)
+library(showtext)
+
+font_add_google("Space Mono", "spacemono_remote")
+showtext_auto()
+
+p_showtext <- ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  labs(title = "Space Mono, fetched live via font_add_google()") +
+  theme_minimal(base_family = "spacemono_remote", base_size = 14)
+p_showtext
+```
+
+## The bug: showtext's DPI has to match the device's, or text is the wrong size
+
+`showtext_opts()` defaults to 96 DPI regardless of what DPI the actual
+graphics device renders at. This project's figures render at 300 DPI
+(`fig-dpi: 300` in `manuscript/_quarto.yml`) - if `showtext_opts(dpi = )`
+is never told that, `showtext`'s text comes out sized for a 96 DPI device
+squeezed into a 300 DPI canvas, visibly too small relative to every other
+plot element:
+
+```{r}
+#| label: fig-showtext-dpi-mismatch
+#| fig-cap: "showtext at the default 96 DPI, rendered on a 300 DPI device - text is too small"
+#| fig-dpi: 300
+p_showtext
+```
+
+```{r}
+#| label: fig-showtext-dpi-fixed
+#| fig-cap: "Same plot, showtext_opts(dpi = 300) matching the actual device - correct size"
+#| fig-dpi: 300
+showtext_opts(dpi = 300)
+p_showtext
+```
+
+Confirmed side by side: the fix isn't in the plot code at all, it's
+`showtext_opts(dpi = )` matching whatever DPI the device actually renders
+at - easy to get wrong once, and easy to forget applies per-document, not
+globally, if a project renders at more than one DPI.
+
+```{r}
+#| label: showtext-cleanup
+#| include: false
+# Turn showtext back off - it intercepts every text-drawing call for the
+# rest of this R session otherwise, which would affect every chunk below.
+showtext_auto(FALSE)
+```
+
+# svglite handles registered fonts differently
+
+`svglite` is a vector device (already used elsewhere in this project for
+`sample-diagram.svg`, see [images-mre.qmd](images-mre.qmd)) - worth
+checking separately from `ragg`'s raster output, since vector and raster
+devices don't have to resolve fonts the same way.
+
+```{r}
+#| label: check-svglite-font-reference
+svglite_path <- tempfile(fileext = ".svg")
+p_local <- ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  labs(title = "Space Mono Local, drawn by svglite") +
+  theme_minimal(base_family = "Space Mono Local")
+svglite::svglite(svglite_path, width = 8, height = 5)
+print(p_local)
+dev.off()
+
+svg_lines <- readLines(svglite_path, warn = FALSE)
+font_refs <- unique(regmatches(
+  svg_lines,
+  regexpr('font-family: "[^"]*"', svg_lines)
+))
+font_refs <- font_refs[nzchar(font_refs)]
+cat("What the SVG actually references:", font_refs[1], "\n")
+```
+
+Confirms a real difference from `ragg`, not a rendering artifact:
+`svglite` writes `font-family: "Space Mono"` - the font's own internal
+family name, from the file's metadata - not `"Space Mono Local"`, the
+alias `register_font()` was given it under. More consequential than the
+naming mismatch itself: the SVG only *references* a font by name, it
+doesn't embed the glyphs the way a raster PNG bakes them into pixels.
+Opening this SVG on a machine without "Space Mono" (the real name)
+available falls back to whatever the browser/viewer picks instead - a
+`ragg`-rendered PNG has no equivalent failure mode, since the actual
+pixels are already drawn.
+
+# extrafont: why it doesn't fit this project
+
+`extrafont::font_import()` is built around scanning *system* font
+directories (`C:\Windows\Fonts` and similar) - not an arbitrary path.
+Pointed at the same local file used successfully above:
+
+```{r}
+#| label: extrafont-failure
+#| error: true
+library(extrafont)
+font_import(paths = here("manuscript/fonts"), prompt = FALSE)
+```
+
+That's not "imports nothing gracefully" - it's a hard error, confirmed
+directly, because `extrafont`'s internal code doesn't expect a pattern
+match to come back empty. To use `extrafont` at all here, the font would
+first need a full, separate, OS-level font installation step outside R
+entirely - real friction `systemfonts::register_font()` simply doesn't
+have, and irrelevant to how this project's figures actually render
+(`ragg`/`svglite`, not the base `pdf()`/`postscript()` devices
+`extrafont` was really built around).
+
+# Root-causing (and fixing) the gen_grob() warning
+
+The warning that started this notebook, reproduced directly by forcing
+the *base* `png()` device instead of this project's default:
+
+```{r}
+#| label: fig-default-device-warning
+#| fig-cap: "flextable::gen_grob() output via the base png() device - produces the warning"
+#| dev: "png"
+#| warning: true
+library(flextable)
+library(patchwork)
+
+ft <- flextable(head(mtcars[, c("mpg", "wt", "cyl")], 5)) |>
+  theme_vanilla() |>
+  flextable::bold(part = "header") |>
+  autofit()
+tbl_grob <- flextable::gen_grob(ft, fit = "fixed", scaling = "min")
+p_a <- ggplot(mtcars, aes(wt, mpg)) + geom_point() + theme_minimal()
+
+p_a + wrap_elements(full = tbl_grob)
+```
+
+```{r}
+#| label: fig-ragg-device-no-warning
+#| fig-cap: "Identical figure, this project's actual default device (ragg_png) - no warning"
+#| warning: true
+p_a + wrap_elements(full = tbl_grob)
+```
+
+Confirmed: the warning is specific to the base `png()` device, which on
+Windows resolves fonts through the legacy GDI font database (the exact
+mechanism named in the warning text itself) - `ragg::agg_png()`, which is
+`systemfonts`-aware, resolves the identical font with nothing printed.
+**Fixed project-wide, not just documented**: `manuscript/_quarto.yml` now
+sets `knitr: opts_chunk: dev: "ragg_png"`, so every figure in this
+project - not just this notebook's own chunks - renders through the
+device confirmed to handle fonts correctly, including the local-file
+registration case above that this project would actually need for a
+future brand font.
+
+# Other web font providers
+
+Not tested directly, but worth knowing about if brand-matching comes up
+later:
+
+- **Bunny Fonts** - a drop-in mirror of the same Google Fonts catalog,
+  EU-hosted, no Google tracking. Same integration pattern as Google Fonts
+  (self-host the files, or point at their CDN) - worth it specifically
+  for GDPR-conscious institutional use, not because the fonts differ.
+- **Adobe Fonts (Typekit)** - a real caveat, not just an alternative:
+  licensing normally ties it to Creative Cloud desktop sync, not
+  downloadable static files, so it typically doesn't fit a reproducible
+  pipeline like this one at all unless the specific font is separately
+  licensed as a static file.
+
+# References

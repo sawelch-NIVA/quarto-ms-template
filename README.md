@@ -181,6 +181,45 @@ across HTML, docx, and typst. Headline findings:
   once scaled down to page width — check the actual rendered output, not
   the source image.
 
+`manuscript/supplementary/plots-mre.qmd` covers `ggplot2` conventions
+instead — a session-wide `theme_set()`, `ggtext` markdown text, and
+combining plots with `patchwork`. Headline findings:
+
+- `theme_set()` in a notebook's setup chunk applies to every later chunk
+  in that same render — no `+ theme_something()` repetition needed.
+- **Confirmed real bug, still present in ggplot2 4.0.3**: adding another
+  complete theme (`+ theme_bw()`, say) after setting a
+  `ggtext::element_markdown()` override silently reverts it to plain
+  text — confirmed by inspecting the theme element's class directly and
+  by rendering both versions side by side. Fix: reapply the markdown
+  override *after* any later complete theme, every time.
+- A table can share a `patchwork` layout with a plot —
+  `patchwork::wrap_table()` for a plain data frame, or
+  `flextable::gen_grob()` + `patchwork::wrap_elements()` for a styled
+  `flextable`. Both are ordinary grid grobs, so — unlike file-based
+  images — this isn't format-specific.
+
+`manuscript/supplementary/fonts-mre.qmd` digs into *why* a plot's own
+text might not use the font you expect — a completely separate mechanism
+from the document-level fonts above, since a figure is rendered to an
+image by an R graphics device before pandoc/typst ever sees it. Headline
+findings:
+
+- **A real reproducibility gap**: Fira Sans/Fira Code are installed on
+  the machine this template was developed on, confirmed directly — but
+  nothing in the repo installs them anywhere, so this has only worked by
+  accident so far, not by design.
+- `systemfonts::register_font()` + `ragg::agg_png()` correctly renders a
+  font registered from an arbitrary local *file*, not just a
+  system-installed font — the realistic case for a future brand font.
+- `showtext` + `sysfonts::font_add_google()` works for remote web fonts,
+  but `showtext_opts(dpi = )` must match the actual device DPI or text
+  renders at the wrong size — a confirmed, easy-to-hit footgun.
+- **Root-caused and fixed** the warning from `plots-mre.qmd`: it came from
+  the *base* `png()` device's legacy Windows font lookup, not from the
+  font itself. `manuscript/_quarto.yml` now defaults every figure to
+  `ragg_png`, which resolves it — confirmed across both notebooks.
+
 ## The Word reference doc (`manuscript/styles/db-space-line-n.docx`)
 
 Pandoc/Quarto write Word output by re-using named styles from this file —

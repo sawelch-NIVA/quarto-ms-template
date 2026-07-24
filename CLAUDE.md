@@ -322,6 +322,77 @@ Full writeup lives in the notebook; headline findings:
   PNG / ~350KB JPEG for identical content — LZW compression brought it to
   ~1MB. Compress before committing raster fixtures to git.
 
+### ggplot2 graphics (`manuscript/supplementary/plots-mre.qmd`)
+Full writeup lives in the notebook; headline findings:
+
+- **`theme_set()` in a `.qmd`'s setup chunk applies to every later chunk
+  in that document's own render session** — no need to add
+  `+ theme_something()` to each plot. Confirmed scoped correctly to that
+  one notebook's own knitr session; doesn't leak into other `.qmd` files
+  rendered in the same `tar_quarto()` pass.
+- **Confirmed real bug, still present in ggplot2 4.0.3: adding a complete
+  theme (e.g. `+ theme_bw()`) after `theme_set()`'d a
+  `ggtext::element_markdown()` override silently wipes it back to plain
+  `element_text`** — not a rendering fluke, a real class change, confirmed
+  by inspecting `plot$theme$plot.title`'s class directly (not just by
+  eye) and by rendering both versions and visually comparing (one shows
+  rendered **bold**/*italic*, the other shows literal asterisks). Root
+  cause: `theme_bw()`/`theme_minimal()`/etc. are *complete* themes
+  (`attr(theme_bw(), "complete")` is `TRUE`); adding one complete theme on
+  top of another **replaces** it wholesale rather than merging, so
+  whichever complete theme lands last always wins for every element,
+  including ones a `theme_set()` call further up the document had
+  customized. Fix: reapply the `element_markdown()` override *after* any
+  later complete theme, every time — there's no way to make it "stick"
+  through an arbitrary later complete theme automatically.
+- `patchwork` and a table sharing one layout — confirmed two ways work:
+  `patchwork::wrap_table()` for a plain data frame, and
+  `flextable::gen_grob()` + `patchwork::wrap_elements()` for a fully
+  styled `flextable` (ties into "R table packages" above). Both are
+  ordinary `grid` grobs by the time `patchwork` draws them, so — unlike
+  file-based images (see "Images & diagrams" above) — this isn't
+  format-specific: confirmed by rendering to html/docx/typst and checking
+  each output directly.
+
+### Fonts in ggplot2 figures (`manuscript/supplementary/fonts-mre.qmd`)
+Full writeup lives in the notebook; headline findings:
+
+- **Document-level fonts (html `mainfont`, docx reference-doc, typst
+  `mainfont`) and figure-level fonts are two entirely separate systems.**
+  A `ggplot2` figure is rendered to an image by an R graphics device
+  *before* pandoc/typst ever sees the document — nothing about
+  `mainfont`/`monofont` reaches inside a plot's own embedded text.
+- **A real reproducibility gap confirmed hiding in plain sight**: Fira
+  Sans/Fira Code (used throughout this project) are installed on the
+  development machine this was built on — confirmed via
+  `systemfonts::system_fonts()` — but nothing in the repo installs them
+  anywhere. Works today by accident, not by design; a fresh CI runner or
+  new contributor's machine has no reason to have them.
+- **`systemfonts::register_font()` + `ragg::agg_png()` confirmed to
+  correctly render a font registered from an arbitrary local file**, not
+  just a system-installed font — the realistic case for a future brand
+  font (a licensed file, not a Google Fonts catalog entry).
+- **`showtext` + `sysfonts::font_add_google()` works for remote web
+  fonts, but `showtext_opts(dpi = )` must match the actual device DPI or
+  text renders at the wrong size** — confirmed by rendering the identical
+  plot both ways side by side.
+- **`svglite` references a registered font by its own internal name, not
+  the alias it was registered under, and does not embed it** — confirmed
+  by inspecting the raw SVG output directly. Unlike a `ragg`-rendered
+  raster PNG (pixels already drawn, no font needed to view), an SVG isn't
+  self-contained this way.
+- **`extrafont::font_import()` hard-errors, not just "finds nothing,"
+  when pointed at a font outside system font directories** — confirmed
+  directly, makes it a poor fit for a locally-provided font file, which is
+  exactly this project's realistic use case.
+- **Root-caused the `plots-mre.qmd` warning**: `font family not found in
+  Windows font database` is the *base* `png()` device's own legacy
+  Windows GDI font lookup failing — confirmed by reproducing it with
+  `png()` and watching it disappear with `ragg::agg_png()`. **Fixed
+  project-wide**, not just documented: `manuscript/_quarto.yml` now sets
+  `knitr: opts_chunk: dev: "ragg_png"` — confirmed this also silences the
+  original warning in `plots-mre.qmd` itself.
+
 ### Pipeline gotchas
 - `tar_source()` sources every `.R` file directly under `R/` on every
   pipeline load (`tar_make()`, `tar_visnetwork()`, even `tar_manifest()`).

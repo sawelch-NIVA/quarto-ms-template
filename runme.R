@@ -28,6 +28,19 @@ required_pkgs <- c(
   "ggplot2",
   "magick",
   "svglite",
+  # Used by supplementary/plots-mre.qmd - drop if you delete that notebook.
+  "ggtext",
+  "patchwork",
+  # Used by supplementary/fonts-mre.qmd and generate-fonts.R - drop if you
+  # delete that notebook. systemfonts/ragg is the recommended combo;
+  # showtext/sysfonts and extrafont are also loaded there for direct
+  # comparison (extrafont specifically to demonstrate why it's a poor fit
+  # here - see the notebook).
+  "systemfonts",
+  "ragg",
+  "showtext",
+  "sysfonts",
+  "extrafont",
   # Used by tests/testthat/ - see manuscript/supplementary/testing-mre.qmd.
   "testthat",
   "withr"
