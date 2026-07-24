@@ -1,11 +1,11 @@
 ---
-# ! Render this project via `targets::tar_make()` (the `render_site` target
-# ! in _targets.R), not `quarto render` on this file directly — see manuscript.qmd.
+# ! Render via `targets::tar_make()` (the `render_manuscript` target in
+# ! _targets.R), not `quarto render` directly - see manuscript.qmd.
 #
-# Files under supplementary/ are rendered as part of the site automatically
-# (Quarto renders every .qmd in the project by default), but they are NOT
-# added to the navbar/sidebar automatically. To surface this notebook in
-# the site navigation, add an entry under `website:` in _quarto.yml, e.g.:
+# Files under supplementary/ render as part of the site automatically
+# (Quarto renders every .qmd by default) but aren't added to the
+# navbar/sidebar automatically. To surface this notebook in the nav, add
+# an entry under `website:` in _quarto.yml:
 #
 #   website:
 #     navbar:
@@ -13,44 +13,45 @@
 #         - href: supplementary/notebook-template.qmd
 #           text: "Supplementary: <short label>"
 #
-# If it's meant to stay off the public nav (e.g. a working/scratch
-# notebook), leave it unlinked — it'll still render, just won't be listed.
+# Leave it unlinked to keep it off the public nav (e.g. a scratch
+# notebook) - it still renders, just isn't listed.
 title: "Supplementary Notebook Title"
 ---
 
 # Purpose
 
 Describe what this notebook explores and how it relates to the main
-manuscript ([manuscript.qmd](../manuscript.qmd)). Depending on the needs of the
-project, the layout of a notebook may be a miniature version of the main manuscript (Introduction, Methods, Results, etc.) or something less formulaic.
+manuscript ([manuscript.qmd](../manuscript.qmd)). A notebook's layout can
+mirror the manuscript (Introduction, Methods, Results) or be less
+formulaic, depending on the project's needs.
 
 ```{r}
 #| label: setup
 #| include: false
 
-# It's generally wise to set include: false wherever you load your packages, as the function returns a lot of session-specific information which is rarely relevant to documents
+# Set include: false wherever you load packages - library() output is
+# session-specific noise, rarely relevant to the document.
 library(targets)
 library(here)
 
-# i_am()'s argument is THIS file's own path relative to the project root -
-# not _targets.R's path. Anchors here() to the root regardless of where this
-# notebook gets knit from.
+# i_am()'s argument is THIS file's own path relative to the project root,
+# not _targets.R's. Anchors here() regardless of where this notebook is knit from.
 i_am("manuscript/supplementary/notebook-template.qmd")
 ```
 
 {{< include _back-to-manuscript.qmd >}}
 
-By default code chunk output to the console is rendered as is (straight onto a white background in HTML, although it gets a grey background in Word and PDF). It looks pretty bad. You also can't reference it.
+By default, console output renders as-is (plain in HTML, grey-backgrounded
+in Word/PDF) - it looks bad, and you can't reference it.
 
 ```{r}
 #| label: explore
-# store= is required here, not optional: tar_read()'s default store
-# lookup is cwd-relative, not here()-anchored, and cwd during chunk
-# execution isn't reliable across every render path (confirmed: it's
-# manuscript/ under a direct `quarto render`, but the repo root under
-# this project's actual tarchetypes::tar_quarto() render - see CLAUDE.md).
-# here("_targets") works either way since here() resolves via upward
-# sentinel search, not cwd.
+# store= is required, not optional: tar_read()'s default store lookup is
+# cwd-relative, and cwd during chunk execution isn't reliable across
+# render paths (confirmed: manuscript/ under a direct `quarto render`, but
+# the repo root under this project's actual tar_quarto() render - see
+# CLAUDE.md). here("_targets") works either way since here() resolves via
+# upward sentinel search, not cwd.
 data <- tar_read(simulate_data, store = here("_targets"))
 head(data)
 ```

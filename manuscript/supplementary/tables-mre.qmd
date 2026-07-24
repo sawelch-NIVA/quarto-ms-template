@@ -1,11 +1,11 @@
 ---
-# Render this project via `targets::tar_make()` (the `render_site` target in
-# _targets.R), not `quarto render` on this file directly — see manuscript.qmd.
+# Render via `targets::tar_make()` (the `render_manuscript` target in
+# _targets.R), not `quarto render` directly - see manuscript.qmd.
 #
-# This is a minimal reproducible example (MRE) for comparing R's main
-# table packages side by side across HTML, docx, and typst (PDF) output.
-# Render all three formats and open them next to each other when
-# deciding which package to standardise on.
+# Minimal reproducible example (MRE) comparing R's main table packages
+# side by side across HTML, docx, and typst (PDF) output. Render all three
+# formats and open them next to each other when deciding which to
+# standardise on.
 #
 # To surface this notebook in the site navigation, see the comment in
 # supplementary/notebook-template.qmd.
@@ -36,9 +36,8 @@ dat <- data.frame(
   p = round(runif(6, 0, 0.1), 3)
 )
 
-# A "big stupid table" — enough rows and long enough text to actually
-# stress column widths, wrapping and pagination, instead of the 6-row toy
-# example above which hides all of that.
+# A bigger, uglier table - enough rows and long enough text to stress
+# column widths, wrapping, and pagination, unlike the 6-row toy above.
 words <- c(
   "alpha",
   "beta",
@@ -127,13 +126,12 @@ is_docx <- identical(render_format, "docx")
 
 # Why this notebook exists
 
-Tables are a pain — in Markdown, in HTML, in Word, in PDF, and
-especially across all three from one source document. The same table
-code does **not** produce equivalent output across formats; several
-packages fail outright on some targets rather than degrading gracefully.
-Notes below are from direct testing in this template, not general
-folklore — commands were actually run against `--to html`, `--to docx`,
-and `--to typst` while writing this.
+Tables are a pain across Markdown, HTML, Word, and PDF — especially all
+three from one source document. The same table code does **not** produce
+equivalent output across formats; several packages fail outright on some
+targets rather than degrading gracefully. Notes below are from direct
+testing in this template, not folklore — commands were actually run
+against `--to html`, `--to docx`, and `--to typst` while writing this.
 
 # The Riders & Runners
 
@@ -164,18 +162,19 @@ don't):
 +------------+-------------------------------------------------+
 
 - ✅ Both render natively in html/docx/typst with no package involved —
-- same pandoc table writer as `kable()`'s output, so docx `Table` style caveat above still applies to these too.
+  same pandoc table writer as `kable()`'s output, so the docx `Table`
+  style caveat above still applies.
 
 Grid tables are genuinely fragile to hand-write: the `+`/`|` characters
 must line up *exactly* by column position across every row. The first
 draft of the table above had one column one space too narrow in the
 header row — pandoc didn't error, it silently dropped the entire
 "Baseline arm." paragraph from the rendered output, with no warning.
-`knitr::kable(x, format = "grid")` looks like the obvious way to
-generate one instead of hand-aligning — it didn't work in the version
-tested here (`could not find function "kable_grid"`). Safest options:
-hand-align very carefully and check the rendered output, or just use a
-pipe table if multi-paragraph cells aren't actually needed.
+`knitr::kable(x, format = "grid")` looks like the obvious way to generate
+one instead of hand-aligning — it didn't work in the version tested here
+(`could not find function "kable_grid"`). Safest options: hand-align
+carefully and check the rendered output, or use a pipe table if
+multi-paragraph cells aren't needed.
 
 ## `knitr::kable()`
 
@@ -196,11 +195,11 @@ kable(dat)
 - ✅ Pretty HTML via Bootstrap classes.
 - 🛑 **Hard-errors** the whole render for both docx and typst — not a
   silent no-op. Confirmed with `kable_styling(bootstrap_options = ...)`
-  alone, no other package involved: `Functions that produce HTML output
-  found in document targeting docx output`. Same failure for typst.
+  alone: `Functions that produce HTML output found in document targeting
+  docx output`. Same failure for typst.
 - Bootstrap styling has no docx/typst equivalent to fall back to, so
-  there's nothing sensible for it to degrade into anyway — gate it to
-  HTML rather than expecting a fallback.
+  there's nothing sensible to degrade into — gate it to HTML rather than
+  expecting a fallback.
 
 ```{r}
 #| label: tbl-kableextra
@@ -219,12 +218,11 @@ kable(dat) |>
 
 - ✅ Pretty HTML with conditional colouring.
 - 🛑 Hard-errors for **docx** (same "HTML output found" error as
-  kableExtra), *unless* the `webshot2` package is installed, in which
-  case it falls back to a static raster screenshot — not an editable
-  Word table.
+  kableExtra), *unless* `webshot2` is installed, in which case it falls
+  back to a static raster screenshot — not an editable Word table.
 - ✅ Renders **natively to typst** — confirmed, no error, real vector
-  table (not a screenshot). This differs from docx and is easy to
-  assume incorrectly if you've only tested one non-HTML format.
+  table (not a screenshot). Differs from docx; easy to assume incorrectly
+  if you've only tested one non-HTML format.
 
 ```{r}
 #| label: tbl-gt
@@ -248,19 +246,18 @@ not docx).*
   typst — confirmed working in all three with no extra configuration.
 - No Lua filter needed in the YAML frontmatter for any of the three
   formats tested here — Quarto's built-in `knit_print.flextable` /
-  print-method integration handles it automatically. (If you've seen
-  advice elsewhere about registering a flextable filter, it isn't
-  necessary for html/docx/typst as of the Quarto version this was
-  tested with.)
+  print-method integration handles it automatically. (Advice elsewhere
+  about registering a flextable filter isn't necessary as of the Quarto
+  version tested here.)
 
 ```{r}
 #| label: tbl-flextable
 #| tbl-cap: "flextable"
 # huxtable and flextable both export bold()/width()/etc. with different
-# signatures — loading both means whichever loaded last wins by default.
-# Namespace explicitly rather than relying on load order (bit us during
-# testing: an unqualified width() call below picked up huxtable's version
-# and errored with "unused arguments").
+# signatures — loading both means whichever loaded last wins. Namespace
+# explicitly rather than relying on load order (an unqualified width()
+# call below picked up huxtable's version during testing and errored
+# with "unused arguments").
 flextable(dat) |>
   theme_vanilla() |>
   flextable::bold(part = "header") |>
@@ -269,11 +266,11 @@ flextable(dat) |>
 
 ## `huxtable`
 
-- ✅✅✅ Also genuinely cross-format (html/docx/typst) from one spec, smaller
-  styling vocabulary than flextable.
+- ✅✅✅ Also genuinely cross-format (html/docx/typst) from one spec, with a
+  smaller styling vocabulary than flextable.
 - Quirk found in typst specifically: the table renders left-shifted
   relative to `gt`/`flextable`'s centred output on the same page — check
-  it visually rather than assuming it matches your other tables in PDF.
+  visually rather than assuming it matches your other tables in PDF.
 
 ```{r}
 #| label: tbl-huxtable
@@ -287,11 +284,11 @@ hux
 ## `DT` (interactive, HTML only)
 
 - Not a static table — a paginated, sortable, filterable JS widget
-  (DataTables). This is the one to reach for when a table is too big to
-  dump on the page at once, rather than trying to force `kable`/`gt` to
-  cope with hundreds of rows.
-- HTML-only by nature (it's a JS widget) — same "HTML output" failure
-  as kableExtra/gt if you don't gate it for docx/typst.
+  (DataTables). Reach for this when a table is too big to dump on the
+  page at once, rather than forcing `kable`/`gt` to cope with hundreds
+  of rows.
+- HTML-only by nature (it's a JS widget) — same "HTML output" failure as
+  kableExtra/gt if not gated for docx/typst.
 
 ```{r}
 #| label: tbl-dt
@@ -309,38 +306,35 @@ where pagination beats a giant static table.*
 ## Stress test: a big, ugly table
 
 30 rows, a `Notes` column with 1–3 sentences of variable-length text.
-Small toy tables hide exactly the problems that show up here — this is
-what actually surfaced the worst finding in this whole notebook, below.
+Small toy tables hide exactly the problems that show up here — this
+surfaced the worst finding in the notebook, below.
 
 ::: {.callout-warning}
 ## Found while stress-testing: typst mangles tables that span a page break
 
 Render this notebook's PDF and look at the stress-test tables (`kable`,
-`flextable`, and `gt` — all three, not just one package): wherever the
-30-row table would break across a page boundary, the text becomes
-unreadable, interleaved character-soup for the rows around the break.
-Confirmed with raw text extraction (`pdftotext`), not just a PDF-viewer
-rendering glitch. It does not happen in HTML or docx — this is
-typst-specific, and it does not error or warn; the render "succeeds"
-with corrupted output.
+`flextable`, and `gt` — all three): wherever the 30-row table breaks
+across a page boundary, the text becomes unreadable, interleaved
+character-soup for the rows around the break. Confirmed with raw text
+extraction (`pdftotext`), not just a PDF-viewer glitch. Doesn't happen in
+HTML or docx — typst-specific, and it doesn't error or warn; the render
+"succeeds" with corrupted output.
 
 Reproduced with Quarto 1.9.36. Root cause looks like Quarto's
-markdown/pandoc-to-typst table writer not handling automatic
-page-breaking correctly once wrapped multi-line cell content is
-involved — small tables (the toy `dat` examples above) never hit this
-because they fit on one page.
+markdown/pandoc-to-typst table writer mishandling automatic page-breaking
+once wrapped multi-line cell content is involved — small tables (the toy
+`dat` examples above) never hit this because they fit on one page.
 
-**If you're targeting typst/PDF: keep tables short enough to fit on one
-page**, or split a long table into page-sized chunks, or exclude it from
-the typst render entirely (gate with `eval: !expr !is_typst`, same
-pattern used elsewhere in this notebook) and point PDF readers at the
-HTML/docx version instead. Don't assume a clean `quarto render` with no
-errors means the PDF is actually correct — check it.
+**If targeting typst/PDF: keep tables short enough to fit on one page**,
+split a long table into page-sized chunks, or exclude it from the typst
+render entirely (gate with `eval: !expr !is_typst`, same pattern used
+elsewhere here) and point PDF readers at the HTML/docx version instead.
+Don't assume a clean `quarto render` means the PDF is correct — check it.
 :::
 
-**`kable`** — no width control at all. In docx this comes out as a
-plain grid table sized however Word feels like sizing it; long `Notes`
-text is not reliably wrapped in a readable way.
+**`kable`** — no width control at all. In docx this comes out as a plain
+grid table sized however Word feels like it; long `Notes` text isn't
+reliably wrapped in a readable way.
 
 ```{r}
 #| label: tbl-big-kable
@@ -366,8 +360,8 @@ flextable(big) |>
 ```
 
 **`gt`** (html/typst only) — no column-width fix applied here
-deliberately, so you can see the same overflow risk `kable` has when a
-text column isn't constrained.
+deliberately, showing the same overflow risk `kable` has when a text
+column isn't constrained.
 
 ```{r}
 #| label: tbl-big-gt

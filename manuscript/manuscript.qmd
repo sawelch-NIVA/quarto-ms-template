@@ -1,8 +1,8 @@
 ---
-# Render this project via `targets::tar_make()` (the `render_manuscript`
-# target in _targets.R), not `quarto render manuscript.qmd` directly — this
-# file reads pipeline outputs with tar_read()/tar_load(), so a direct
-# render can use stale or missing data if the pipeline hasn't been run.
+# Render via `targets::tar_make()` (the `render_manuscript` target in
+# _targets.R), not `quarto render` directly - this file reads pipeline
+# outputs via tar_read()/tar_load(), so a direct render can use stale or
+# missing data.
 title: "Manuscript Title"
 author:
   - name: "Your Name"
@@ -32,10 +32,9 @@ source(here("R/functions.R"))
 #| include: false
 
 # detect_render_format() (R/functions.R) always returns real, non-NULL
-# values for every field - see that function's roxygen comment for why a
-# hand-rolled version of this lookup previously broke with
-# "object 'is_html' not found" whenever QUARTO_EXECUTE_INFO was unset
-# (tarchetypes' dependency-scanning pass, or a standalone/interactive knit).
+# values - see its roxygen comment for why a hand-rolled version of this
+# previously broke with "object 'is_html' not found" whenever
+# QUARTO_EXECUTE_INFO was unset.
 fmt <- detect_render_format()
 is_html <- fmt$is_html
 is_typst <- fmt$is_typst
@@ -66,15 +65,15 @@ This is a table @tbl-01-example. For some reason, they use different caption var
 
 ::: {.callout-note}
 Each table/figure has its own build file (`tables/tbl-01-example.R`,
-`figures/fig-01-example.R` - own packages, own styling code, nothing
+`figures/fig-01-example.R` - own packages and styling code, nothing
 shared) and its own thin include partial (`tables/_tbl-01-example.qmd`,
-`figures/_fig-01-example.qmd`) that pulls the built object in here via an
+`figures/_fig-01-example.qmd`) that pulls the built object in via an
 include shortcode. The `export_tables`/`export_figures` targets in
-`_targets.R` write the *same* built object to a standalone docx/TIFF in
-`submission/` (not `output/` — Quarto's website render deletes anything
-under `output/` it doesn't recognize as its own, confirmed by direct
-testing), so the embedded version above and the standalone submission file
-are never two different definitions of the same table/figure.
+`_targets.R` write that same built object to a standalone docx/TIFF in
+`submission/`, not `output/` - Quarto's website render deletes anything
+under `output/` it doesn't recognize as its own - so the embedded and
+standalone versions are never two different definitions of the same
+table/figure.
 :::
 
 
@@ -87,12 +86,10 @@ Because notebooks, etc. are provided via the sidebar, they don't show up in HTML
 #| label: si-links
 #| output: asis
 
-# Auto-generated from whatever's actually in supplementary/ - add a new
-# notebook there and it shows up here with no manual list to maintain.
-# Excludes notebook-template.qmd (a starting point for new notebooks, not
-# content). Docx/typst output only: this whole block is hidden for html
-# (the sidebar nav covers it there), and `ext` below only knows how to
-# build links for the two non-html formats.
+# Auto-generated from whatever's in supplementary/ - add a notebook there
+# and it appears here with no manual list to maintain. Excludes
+# notebook-template.qmd (a starting point, not content). Docx/typst only:
+# hidden for html, where the sidebar nav covers it instead.
 si_files <- list.files(here("manuscript/supplementary"), pattern = "\\.qmd$")
 si_files <- sort(setdiff(si_files, "notebook-template.qmd"))
 

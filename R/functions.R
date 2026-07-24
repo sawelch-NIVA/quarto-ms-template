@@ -1,47 +1,37 @@
 # R/functions.R ----
-# Custom functions used by the targets pipeline (_targets.R) or in Quarto files.
-# Split into multiple files here as the project grows
-# (e.g. R/read_data.R, R/models.R, R/figures.R) — tar_source() picks up
-# everything in R/ automatically. So don't put random scripts in here!
+# Functions used by the pipeline (_targets.R) and Quarto files. Split into
+# more files as the project grows (R/read_data.R, R/models.R, ...) -
+# tar_source() picks up everything in R/, so don't put scripts with side
+# effects in here.
 
 # --- Render format detection ---------------------------------------------
-# manuscript/manuscript.qmd's own basename (without extension). Supplementary
-# notebooks' "back to manuscript" link partial reads this instead of
-# hardcoding it in four separate files, so a future rename only needs
-# updating here.
+# manuscript.qmd's basename, without extension. Read by the supplementary
+# notebooks' "back to manuscript" link partial instead of hardcoding it in
+# every notebook, so a rename only needs updating here.
 MANUSCRIPT_BASENAME <- "manuscript"
 
-#' Detect which format Quarto is currently rendering, robustly
+#' Detect which format Quarto is currently rendering
 #'
-#' Every .qmd/partial that needs is_html/is_typst/is_docx-style format
-#' gating used to copy-paste the QUARTO_EXECUTE_INFO env var lookup
-#' (confirmed working in manuscript/supplementary/tables-mre.qmd) by hand.
-#' One hand-rolled copy in manuscript.qmd broke two ways at once: it used
-#' `exists("info_file")` to guard against the env var being unset, but
-#' info_file is *always* assigned on the line just above (as `""` when
-#' unset, not absent) so exists() was always TRUE and never actually
-#' guarded anything; and the fallback branch that ran when the var *was*
-#' genuinely empty only ever set is_interactive, never is_html/is_typst/
-#' is_docx - so downstream code checking `is_html` failed with
-#' "object 'is_html' not found" whenever QUARTO_EXECUTE_INFO was unset.
-#' That happens in two situations, both confirmed in this project: (1)
-#' tarchetypes::tar_quarto()'s own dependency-scanning pass evaluates chunk
-#' options like `eval: !expr is_html` without running the setup chunk (or a
-#' real render) first - see CLAUDE.md's "Pipeline gotchas"; (2) a .qmd knit
-#' standalone/interactively in an editor, outside any `quarto render`
-#' invocation.
+#' Reads QUARTO_EXECUTE_INFO once so every .qmd/partial needing
+#' is_html/is_typst/is_docx-style gating doesn't hand-roll the lookup. A
+#' previous hand-rolled copy in manuscript.qmd broke because its
+#' `exists("info_file")` guard was always TRUE (info_file is assigned `""`
+#' when unset, never absent) and its fallback branch never set
+#' is_html/is_typst/is_docx - so downstream code failed with "object
+#' 'is_html' not found" whenever the env var was unset. That happens when
+#' tar_quarto()'s dependency-scan pass evaluates chunk options like
+#' `eval: !expr is_html` before running the setup chunk (see CLAUDE.md's
+#' "Pipeline gotchas"), or when a .qmd is knit standalone outside
+#' `quarto render`.
 #'
-#' This always returns every field with a real, non-NULL value - FALSE
-#' rather than undefined for the is_* flags when the format can't be
-#' determined - so callers never need exists()/is.null() guards, and
-#' `eval: !expr is_html`-style YAML chunk options (which need a bare
-#' symbol, not a list member - unpack the return value into your own
-#' is_html/is_typst/is_docx variables) always have something to read.
+#' Always returns every field with a real value (FALSE, not undefined, for
+#' unknown is_*), so callers never need exists()/is.null() guards, and
+#' `eval: !expr is_html`-style YAML options (which need a bare symbol -
+#' unpack the list into your own variables) always have something to read.
 #'
-#' `ext` is the actual output file extension for the CURRENT format,
-#' useful for linking to a sibling output file (e.g. "See the main
-#' manuscript") - note typst compiles to PDF on disk, not .typ (see
-#' rendering-pipeline.qmd), so this is "pdf" for typst, not "typst".
+#' `ext` is the current format's actual output extension, for linking to a
+#' sibling output file - typst compiles to PDF on disk, so this is "pdf",
+#' not "typst".
 detect_render_format <- function() {
   info_file <- Sys.getenv("QUARTO_EXECUTE_INFO")
 
@@ -72,17 +62,16 @@ detect_render_format <- function() {
 }
 
 # --- Standalone submission exports --------------------------------------
-# Some journals require every table/figure as its own individually named
-# file (tbl-01-*.docx, fig-01-*.tif), on top of (or instead of) embedding
-# them in the manuscript. Rather than a second render pass, these export
-# the *same* flextable/ggplot objects used in manuscript.qmd directly to their
-# own file — one source per table/figure, packaged twice.
+# Some journals require every table/figure as its own named file
+# (tbl-01-*.docx, fig-01-*.tif) in addition to the embedded manuscript
+# copy. These export the same flextable/ggplot object used in
+# manuscript.qmd - one source, packaged twice, not a second render pass.
 
 #' Export a single flextable as a standalone docx
 #'
-#' Goes through flextable::save_as_docx() directly, not Quarto/pandoc —
-#' sidesteps the docx reference-doc style-mapping quirks in CLAUDE.md
-#' entirely, since nothing here depends on named Word styles resolving.
+#' Uses flextable::save_as_docx() directly, not Quarto/pandoc - sidesteps
+#' the reference-doc style-mapping quirks in CLAUDE.md, since nothing here
+#' depends on named Word styles resolving.
 export_table_docx <- function(ft, name, dir) {
   if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
   path <- file.path(dir, paste0(name, ".docx"))
@@ -90,32 +79,25 @@ export_table_docx <- function(ft, name, dir) {
   path
 }
 
-#' Set a flextable's font to match the current render format's own default
+#' Set a flextable's font to match the current render format's body font
 #'
-#' flextable defaults to Arial regardless of output format (its own
-#' package-level default, confirmed via `flextable::get_flextable_defaults()`)
-#' — html/typst/docx all pick this up identically, which reads as
-#' "consistent" but actually means the table never matches any of the three
-#' formats' own body font: html uses `mainfont: Fira Sans`
+#' flextable defaults to Arial regardless of format (confirmed via
+#' `get_flextable_defaults()`), so left alone it matches none of this
+#' project's actual body fonts: html uses `Fira Sans`
 #' (manuscript/_quarto.yml), docx falls back to the reference doc's theme
-#' font (`Aptos`, confirmed by reading db-space-line-n.docx's
-#' word/theme/theme1.xml), and typst uses its own built-in default
-#' (`Libertinus Serif`, confirmed via `pdffonts`-equivalent inspection of a
-#' rendered PDF's embedded font names — this project sets no typst
-#' `mainfont` override).
+#' font (`Aptos`, from db-space-line-n.docx's word/theme/theme1.xml), and
+#' typst uses its built-in `Libertinus Serif` (confirmed via the rendered
+#' PDF's embedded font names - no typst `mainfont` override is set here).
 #'
-#' A flextable object is built once upstream (tar_target) and reused
-#' verbatim across all three format renders via {{< include >}} - it can't
-#' know its eventual output format at construction time, and
-#' set_flextable_defaults() only affects flextables created *after* it's
-#' called, not ones already built. So this has to run at print time, in the
-#' include partial, on the already-built object - flextable::font()
-#' explicitly overrides an existing table's font regardless of how it was
-#' originally styled, unlike changing the defaults.
+#' Must run at print time (in the include partial), not build time: the
+#' flextable object is built once upstream and reused across all three
+#' formats via {{< include >}}, so it can't know its eventual format at
+#' construction, and set_flextable_defaults() only affects tables built
+#' after it's called. flextable::font() overrides an existing table's font
+#' regardless of prior styling, which is what makes this work.
 #'
-#' Uses detect_render_format() (above) for the format lookup, so both
-#' this and every notebook's format-gating logic stay consistent if the
-#' detection approach ever needs to change.
+#' Uses detect_render_format() so this stays consistent with every
+#' notebook's own format-gating logic.
 flextable_use_format_font <- function(ft) {
   fmt <- detect_render_format()
 
@@ -135,12 +117,12 @@ flextable_use_format_font <- function(ft) {
 
 #' Export a single ggplot as a standalone LZW-compressed TIFF
 #'
-#' Renders to PNG first, then converts with magick — mirrors
-#' generate-images.R's approach rather than ggsave's built-in tiff
-#' device, whose LZW support isn't consistent across platforms. Deliberately
-#' never runs inside a knitr chunk that also feeds the typst render: TIFF
-#' hard-errors typst (see CLAUDE.md), and because tar_quarto() renders every
-#' format in one pass, a TIFF failure there would take html/docx down too.
+#' Renders to PNG first, then converts with magick, mirroring
+#' generate-images.R - ggsave's built-in tiff device has inconsistent LZW
+#' support across platforms. Runs as its own target, not a chunk in the
+#' typst render: TIFF hard-errors typst (see CLAUDE.md), and tar_quarto()
+#' renders every format in one pass, so a TIFF failure there would take
+#' html/docx down too.
 export_figure_tiff <- function(plot, name, dir, width = 6, height = 4, dpi = 300) {
   if (!dir.exists(dir)) dir.create(dir, recursive = TRUE)
   png_path <- tempfile(fileext = ".png")

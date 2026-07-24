@@ -1,28 +1,25 @@
-<!-- # manuscript/tables/_tbl-01-example.qmd ----
-     Include partial, not a page - leading underscore keeps Quarto's
-     website-project renderer from also rendering this as its own site
-     page (same convention as _quarto.yml/_freeze/_targets). Kept
-     deliberately thin: the actual table lives in tbl-01-example.R via
-     the pipeline; this file's only job is pulling that target's value
-     into wherever {{< include >}} places it. Needs its own library(flextable)
-     call - confirmed by direct testing that without it, the object prints
-     as a dumped internal structure instead of an actual table, since the
-     package that owns the print method isn't guaranteed loaded in this
-     render session just because it built the object upstream.
+<!-- manuscript/tables/_tbl-01-example.qmd ----
+     Include partial, not a page - the leading underscore keeps Quarto's
+     website renderer from also rendering this as its own page (same
+     convention as _quarto.yml/_freeze/_targets). Kept thin: the table
+     itself lives in tbl-01-example.R via the pipeline; this file just
+     pulls that target's value in via {{< include >}}. Needs its own
+     library(flextable) call - without it the object prints as a dumped
+     internal structure, since the print method's package isn't
+     guaranteed loaded in this render session just because it built the
+     object upstream.
 
      flextable_use_format_font() (R/functions.R) overrides flextable's
-     own Arial default to match whatever font each output format actually
-     uses for its own body text - see that function's roxygen comment for
-     why this has to happen here (print time) rather than in
-     tbl-01-example.R (build time). -->
+     Arial default to match each format's own body font - see its roxygen
+     comment for why this must happen here at print time, not at build
+     time in tbl-01-example.R. -->
 
 ```{r}
 #| label: tbl-01-example
 #| tbl-cap: "Example table generated from the pipeline."
 library(flextable)
-# R/functions.R isn't auto-sourced into Quarto's own render session (that's
-# tar_source()'s job, and it only runs inside the targets pipeline's R
-# session) - same reasoning as the library(flextable) call above.
+# R/functions.R isn't auto-sourced into Quarto's render session - tar_source()
+# only runs inside the targets pipeline's R session.
 source(here::here("R/functions.R"))
 targets::tar_read(tbl_01_example, store = here::here("_targets")) |>
   flextable_use_format_font()

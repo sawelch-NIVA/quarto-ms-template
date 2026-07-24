@@ -1,24 +1,21 @@
 # generate-images.R ----
-# One-time generator for the fixture images in manuscript/img/, used by
-# manuscript/supplementary/images-mre.qmd to stand in for "images created
-# elsewhere and loaded from a file" (as opposed to figures generated inline
-# by an R chunk). Run manually if these need regenerating; the outputs are
-# committed to git like any other fixture, not rebuilt by the targets
-# pipeline. Lives at the project root (not in R/) because tar_source()
-# sources every .R file under R/ on every pipeline load - a script with
-# side effects like this one does not belong there (see CLAUDE.md's
-# runme.R note for the same reason).
+# One-time generator for fixture images in manuscript/figures/, used by
+# supplementary/images-mre.qmd to stand in for "images created elsewhere
+# and loaded from a file" (vs. figures generated inline by an R chunk). Run
+# manually to regenerate; outputs are committed to git, not rebuilt by the
+# pipeline. Lives at the project root, not R/, since tar_source() sources
+# every .R file under R/ on every pipeline load - a side-effecting script
+# doesn't belong there (see CLAUDE.md's runme.R note).
 #
 # Produces, at a deliberately large pixel size so format/legibility
-# differences actually show up when the images are scaled down to page width:
-#   img/sample-photo.png   - busy raster content (photo/micrograph stand-in), PNG
-#   img/sample-photo.jpg   - the same raster content, JPEG (lossy) for comparison
-#   img/sample-scan.tiff   - the same raster content, TIFF (scientific-imaging
-#                            format; not supported by every renderer, that's
-#                            the point of including it)
-#   img/sample-diagram.svg - a true vector diagram (boxes/arrows/fine text)
-#                            drawn with svglite, standing in for something
-#                            exported from Illustrator/Inkscape/PowerPoint
+# differences show up once scaled down to page width:
+#   figures/sample-photo.png   - busy raster content (photo/micrograph stand-in)
+#   figures/sample-photo.jpg   - same content, lossy JPEG, for comparison
+#   figures/sample-scan.tiff   - same content, TIFF (scientific-imaging format,
+#                                not supported by every renderer - the point)
+#   figures/sample-diagram.svg - true vector diagram (boxes/arrows/fine text)
+#                                via svglite, standing in for an Illustrator/
+#                                Inkscape/PowerPoint export
 
 library(magick)
 library(svglite)
@@ -28,7 +25,7 @@ library(here)
 here::i_am("generate-images.R")
 
 set.seed(42)
-out_dir <- here("manuscript/img")
+out_dir <- here("manuscript/figures")
 
 # --- Raster content: a busy, high-resolution synthetic "micrograph" ----
 # Large canvas + fine text at several sizes + thin lines, so downscaling to
@@ -79,8 +76,8 @@ dev.off()
 
 image_write(img, file.path(out_dir, "sample-photo.png"), format = "png")
 image_write(img, file.path(out_dir, "sample-photo.jpg"), format = "jpg", quality = 60)
-# LZW compression - real scientific-instrument TIFFs are almost always
-# compressed; an uncompressed write here bloats the git repo for no benefit.
+# LZW compression - real scientific TIFFs are usually compressed;
+# uncompressed here just bloats the repo.
 image_write(img, file.path(out_dir, "sample-scan.tiff"), format = "tiff", compression = "LZW")
 
 # --- Vector content: a small schematic drawn directly with grid/svglite ----

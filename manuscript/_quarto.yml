@@ -1,49 +1,47 @@
 # manuscript/_quarto.yml ----
-# Using the `website` project type rather than `manuscript` — manuscript
+# Using the `website` project type rather than `manuscript` - manuscript
 # projects force a Jupyter engine/kernel even for pure-R content, which we
 # don't want here.
 #
-# This is a self-contained Quarto project rooted at manuscript/, one level
-# below the repo root - its own _freeze/, .quarto/, and (via output-dir
-# below) its own slice of the shared output/ folder, isolated from
-# anything else in the repo. Pattern borrowed from
-# https://github.com/kazuyanagimoto/quarto-research-blog. See
-# "Directory layout" in CLAUDE.md/README.md for the full picture.
+# Self-contained Quarto project rooted at manuscript/, one level below the
+# repo root - its own _freeze/, .quarto/, and (via output-dir below) its
+# own output/ folder, isolated from anything else in the repo. Pattern
+# borrowed from https://github.com/kazuyanagimoto/quarto-research-blog.
+# See "Directory layout" in CLAUDE.md/README.md for the full picture.
 
 project:
   type: website
-  # output-dir must stay INSIDE this project's own directory (manuscript/) -
-  # confirmed by direct testing that pointing it outside via output-dir:
-  # ../output is a genuinely broken configuration, not just an unusual one:
-  # Quarto warns "did not expect the path configuration being used in this
+  # output-dir must stay INSIDE this project's own directory (manuscript/)
+  # - confirmed by direct testing that pointing it outside via output-dir:
+  # ../output is a genuinely broken configuration, not just unusual: Quarto
+  # warns "did not expect the path configuration being used in this
   # project, and strange behavior may result" and "Refusing to remove
   # directory ... since it is not a subdirectory of the main project
   # directory", and in practice scattered rendered output across THREE
   # places at once (a stray index_files/ at the repo root, a full render
   # dropped directly in manuscript/, and the intended output/) instead of
-  # writing cleanly to one. This is the likely root cause of a recurring
-  # typst "file not found" bug for intermediate _files/ images and possibly
-  # the docx-corruption regression too - both are classic symptoms of
-  # Quarto's internal intermediate-file bookkeeping getting confused about
-  # where things belong. Output now lands in manuscript/output/, not
-  # output/ at the repo root - see CLAUDE.md/README.md's "Directory layout".
+  # writing cleanly to one. Likely root cause of a recurring typst "file
+  # not found" bug for intermediate _files/ images, and possibly the
+  # docx-corruption regression too - both classic symptoms of Quarto's
+  # intermediate-file bookkeeping getting confused about where things
+  # belong. Output now lands in manuscript/output/, not output/ at the
+  # repo root - see CLAUDE.md/README.md's "Directory layout".
   output-dir: output
-  # Execute every .qmd's code with a working directory meant to be this
-  # project's own root (manuscript/), not the file's own folder (Quarto's
-  # default) - confirmed by direct testing this only actually holds for a
-  # plain `quarto render`; this project's real render path
+  # Meant to execute every .qmd's code with cwd = this project's own root
+  # (manuscript/), not the file's own folder (Quarto's default) -
+  # confirmed by direct testing this only actually holds for a plain
+  # `quarto render`; this project's real render path
   # (tarchetypes::tar_quarto(), the render_manuscript target in
   # _targets.R) has cwd = the REPO ROOT instead, not manuscript/ - see
   # CLAUDE.md's "Consequence of nesting manuscript/..." section. Don't
   # trust cwd for any file path in manuscript/**/*.qmd regardless of this
-  # setting; use here::here(...) (anchored via here::i_am()) instead.
-  # E.g. tar_read()/tar_load() calls in manuscript.qmd/supplementary/
-  # *.qmd/tables/figures partials can't find _targets/ via a plain
-  # tar_read(x) - that store lives at the repo root, not inside
-  # manuscript/ either way. Pass store = here::here("_targets")
-  # explicitly to every tar_read()/tar_load() call instead of relying on
-  # cwd - confirmed by direct testing this is genuinely required, not
-  # just defensive.
+  # setting; use here::here(...) (anchored via here::i_am()) instead. E.g.
+  # tar_read()/tar_load() calls in manuscript.qmd/supplementary/*.qmd/
+  # tables/figures partials can't find _targets/ via a plain tar_read(x) -
+  # that store lives at the repo root, not inside manuscript/ either way.
+  # Pass store = here::here("_targets") explicitly to every
+  # tar_read()/tar_load() call instead of relying on cwd - confirmed by
+  # direct testing this is genuinely required, not just defensive.
   execute-dir: project
 
 lang: en-GB

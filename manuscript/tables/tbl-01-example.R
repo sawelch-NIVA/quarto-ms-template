@@ -1,13 +1,11 @@
-# # manuscript/tables/tbl-01-example.R ----
-# Builds tbl-01-example. Standalone file so it's easy to open and tinker
-# with directly, and so this table's own styling packages don't have to be
-# loaded by every target in the pipeline. Sourced automatically by
-# _targets.R's tar_source("manuscript/tables") call; wired in as the
-# tbl_01_example target there, which passes in whatever upstream targets
-# this needs explicitly (here just `model`) so targets' static dependency
-# scanner can still see the edge - that scanner only reads _targets.R's own
-# command expressions, not code inside a sourced file, so a bare
-# source()-and-return pattern would silently lose dependency tracking.
+# manuscript/tables/tbl-01-example.R ----
+# Builds tbl-01-example. Standalone so it's easy to tinker with directly,
+# and so this table's styling packages aren't loaded by every pipeline
+# target. Sourced by _targets.R's tar_source("manuscript/tables"); wired in
+# as the tbl_01_example target there, which passes upstream targets in
+# explicitly (here just `model`) so targets' dependency scanner can see the
+# edge - it only reads _targets.R's own command expressions, not code
+# inside a sourced file.
 library(flextable)
 
 build_tbl_01_example <- function(model) {

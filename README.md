@@ -52,10 +52,10 @@ manuscript/          →  a self-contained Quarto project, one level below the
   ├─ tables/          →  one build file (tbl-NN-slug.R) + include partial
                          (_tbl-NN-slug.qmd) per table — see below
   ├─ figures/         →  same pattern as tables/, one pair of files per
-                         figure
+                         figure, plus static fixture images for
+                         supplementary/images-mre.qmd
   ├─ supplementary/   →  extra notebooks (see below)
   ├─ styles/          →  CSL file + Word reference docs
-  ├─ img/             →  fixture images for supplementary/images-mre.qmd
   ├─ references.bib   →  bibliography
   └─ output/          →  rendered HTML/docx/PDF (git-ignored, rebuilt by
                          tar_make()) — Quarto's website render deletes
@@ -67,21 +67,21 @@ manuscript/          →  a self-contained Quarto project, one level below the
 Why `manuscript/` is isolated like this: Quarto's freeze cache
 (`_freeze/`) and intermediate render artifacts (`*_files/`) are keyed to
 a specific project. Keeping the manuscript as its own nested project means
-its cache can never go stale by cross-contamination with anything else in
-the repo, and `rm -rf manuscript/_freeze manuscript/.quarto manuscript/output`
+its cache can never go stale from cross-contamination with anything else
+in the repo, and `rm -rf manuscript/_freeze manuscript/.quarto manuscript/output`
 is always a safe, complete "start fresh" if a render ever looks wrong.
 
 **`output-dir` has to resolve inside `manuscript/` itself.** An earlier
-version of this template pointed it outside (`output-dir: ../output`) to
-keep rendered output at the repo root — Quarto accepts that YAML without
-complaint but doesn't actually support it: it warned about an unexpected
-path configuration and, in practice, scattered one render's output across
-three different locations at once instead of writing cleanly to one. That
-was the root cause of a recurring typst "file not found" error. Moving
-output-dir back inside `manuscript/` fixed it. See CLAUDE.md for the full
-diagnosis. (A separate docx "Word found unreadable content" bug was once
-misattributed to this same fix — it wasn't; see "Known Issues" below for
-the real cause and fix.)
+version pointed it outside (`output-dir: ../output`) to keep rendered
+output at the repo root — Quarto accepts that YAML without complaint but
+doesn't actually support it: it warned about an unexpected path
+configuration and scattered one render's output across three different
+locations at once instead of writing cleanly to one. That was the root
+cause of a recurring typst "file not found" error. Moving output-dir back
+inside `manuscript/` fixed it. See CLAUDE.md for the full diagnosis. (A
+separate docx "Word found unreadable content" bug was once misattributed
+to this same fix — it wasn't; see "Known Issues" below for the real cause
+and fix.)
 
 Each table/figure has its own **build file** (`tables/tbl-01-example.R`,
 defining a `build_*()` function with its own package loads and styling
@@ -93,16 +93,15 @@ its own target, and `submission/` gets the same built object exported as
 a standalone docx/TIFF — one definition per table/figure, packaged twice.
 See CLAUDE.md's "Standalone submission exports" for the full detail,
 including two confirmed gotchas (include partials need their own
-`library()` call; `tar_read()`/`tar_load()` inside `manuscript/` need an
+`library()` call; `tar_read()`/`tar_load()` inside `manuscript/` needs an
 explicit `store = here::here("_targets")` since the `_targets/` store
 lives one level up from the manuscript project's own root).
 
 **Always render through `targets::tar_make()`, not `quarto render`
-directly.** `manuscript/manuscript.qmd` (and any notebook that calls
+directly.** `manuscript/manuscript.qmd` (and any notebook calling
 `tar_read()`/`tar_load()`) depends on the `_targets/` data store;
-rendering it standalone can pick up stale or missing data. Every `.qmd` in
-this repo has a comment at the top of its YAML front matter as a
-reminder.
+rendering it standalone can pick up stale or missing data. Every `.qmd`
+here has a reminder comment at the top of its YAML front matter.
 
 ## Output formats
 
@@ -117,8 +116,8 @@ required.
 Default figure size is 6in × 4in at 300 DPI (`fig-width`/`fig-height`/
 `fig-dpi` in `manuscript/_quarto.yml`) — sized for print-quality docx output.
 HTML figures come out at double that pixel density (knitr's
-`fig.retina = 2` default) for sharp on-screen rendering; that's
-intentional, not a bug, and doesn't affect the docx copy.
+`fig.retina = 2` default) for sharp on-screen rendering; intentional, not
+a bug, and doesn't affect the docx copy.
 
 ## Adding a notebook
 
@@ -126,16 +125,15 @@ Anything under `manuscript/supplementary/` renders automatically as part
 of the site (Quarto renders every `.qmd` in the project by default), but
 isn't added to the navbar automatically. Copy
 `manuscript/supplementary/notebook-template.qmd` as a starting point — it
-has a comment explaining how to link it from `manuscript/_quarto.yml` if
-you want it in the site nav, or leave it unlinked for scratch/working
-notebooks.
+has a comment explaining how to link it from `manuscript/_quarto.yml` for
+the site nav, or leave it unlinked for scratch/working notebooks.
 
 `manuscript/supplementary/tables-mre.qmd` is a working comparison of R's main
 table packages (`kable`, `kableExtra`, `gt`, `flextable`, `huxtable`,
 `DT`) across HTML, docx, and typst, including a stress test with a
-large/long-text table, not just clean 6-row toy examples. Read it
-before picking a tables package — several fail outright (not just
-"look different") on some formats. Headline findings:
+large/long-text table, not just clean 6-row toy examples. Read it before
+picking a tables package — several fail outright, not just "look
+different," on some formats. Headline findings:
 
 - `kableExtra` and `gt` **hard-error** a docx or typst render if not
   gated to HTML — they don't degrade gracefully.
@@ -149,10 +147,10 @@ before picking a tables package — several fail outright (not just
   extraction (not a PDF viewer glitch), no error or warning at render
   time. Keep typst-bound tables short enough to fit on one page.
 
-`manuscript/supplementary/images-mre.qmd` is the same kind of comparison for images
-and diagrams: mermaid, auto-generated (ggplot2) figures, and images
-created elsewhere and loaded from a file (PNG/JPEG/SVG/TIFF), across
-HTML, docx, and typst. Headline findings:
+`manuscript/supplementary/images-mre.qmd` is the same kind of comparison
+for images and diagrams: mermaid, auto-generated (ggplot2) figures, and
+images created elsewhere and loaded from a file (PNG/JPEG/SVG/TIFF),
+across HTML, docx, and typst. Headline findings:
 
 - Mermaid diagrams work natively across all three formats with no extra
   install — Quarto converts them to PNG for docx/typst on its own.
@@ -168,12 +166,12 @@ HTML, docx, and typst. Headline findings:
 
 ## The Word reference doc (`manuscript/styles/db-space-line-n.docx`)
 
-Pandoc/Quarto write Word output by re-using named styles from this
-file — anything it doesn't define, Word silently substitutes a
-generic default for, with no error or warning either at render time or
-when you open the file. As shipped, `manuscript/styles/db-space-line-n.docx`
-covered headings, title/subtitle, quotes, and line numbering, but was
-missing several styles pandoc actively references, most importantly:
+Pandoc/Quarto write Word output by re-using named styles from this file —
+anything it doesn't define, Word silently substitutes a generic default
+for, with no error or warning either at render time or when you open the
+file. As shipped, `manuscript/styles/db-space-line-n.docx` covered
+headings, title/subtitle, quotes, and line numbering, but was missing
+several styles pandoc actively references, most importantly:
 
 - **`Table`** — the style applied to every rendered table. Missing it
   is very likely why tables look inconsistent/plain in Word.
@@ -191,11 +189,11 @@ by direct testing (not just added and assumed correct):**
 - **`Hyperlink`** — pandoc tags every hyperlink run (external links *and*
   crossreferences like `Figure 1`/`Table 1`/citation links) with
   `<w:rStyle w:val="Hyperlink"/>`, unconditionally. Neither reference doc
-  actually defined that style (Word only knew the name as a "latent"/
-  reserved style it could offer, never one with real formatting behind
-  it), so every hyperlink rendered as plain, unstyled text. Fixed by
-  adding a real character style (`#0563C1`, single underline — Word's own
-  built-in default for this exact style name).
+  defined that style (Word only knew the name as a "latent"/reserved
+  style it could offer, never one with real formatting behind it), so
+  every hyperlink rendered as plain, unstyled text. Fixed by adding a real
+  character style (`#0563C1`, single underline — Word's own built-in
+  default for this exact style name).
 - **`Verbatim Char`** (inline code, e.g. `` `read_csv()` `` in prose) and
   **`Source Code`** (fenced code blocks) — same "referenced but never
   defined" gap. Without `Verbatim Char` defined, inline/block code wasn't
@@ -208,14 +206,14 @@ by direct testing (not just added and assumed correct):**
 
 Fix for anything still missing: open the docx in Word and define a new
 style with the exact name pandoc references (Word's *Styles* pane → *New
-Style*). You don't need to import anything — pandoc just needs a style
-with the matching name to exist. To find out what name pandoc used for a
-given construct without guessing, convert a minimal example and inspect
+Style*). No import needed — pandoc just needs a style with the matching
+name to exist. To find out what name pandoc used for a given construct
+without guessing, convert a minimal example and inspect
 `word/document.xml`/`word/styles.xml` directly (unzip the docx) — see
 [rendering-pipeline.qmd](manuscript/supplementary/rendering-pipeline.qmd)'s
 "general recipe" section for the full procedure, and "Known Issues" below
-for one place this same mechanism turned out **not** to be fixable this
-way (callout header/body splitting).
+for one place this mechanism turned out **not** to be fixable this way
+(callout header/body splitting).
 
 ## Citations
 
@@ -244,11 +242,11 @@ Quarto Wingman:
 ### `output-dir` escaping the project directory
 
 An earlier version of this template pointed `manuscript/_quarto.yml`'s
-`output-dir` outside `manuscript/` (`../output`) to keep rendered output at
-the repo root. Quarto accepts that YAML without complaint but doesn't
-actually support it, and the rendering process ends up creating
-intermediate files in the wrong place, which it then can't find. You'll
-get errors that look like this when run via `_targets.R`.
+`output-dir` outside `manuscript/` (`../output`) to keep rendered output
+at the repo root. Quarto accepts that YAML without complaint but doesn't
+actually support it, and rendering ends up creating intermediate files in
+the wrong place, then can't find them. Errors look like this via
+`_targets.R`:
 
 ```r
 + render_site dispatched                                    
@@ -290,15 +288,14 @@ WARN: Quarto did not expect the path configuration being used in this project, a
 ERROR: Typst compilation failed
 ```
 
-The actual fix is to keep `output-dir` inside `manuscript/` (it's just
-`output` now, not `../output` — see "Directory layout" above), not a
-`freeze` setting. Whatever the immediate symptom, delete any leftover
-intermediate files (`index_files/`, `*_files/`, stray `index.docx`/
-`index.html`/`index.typ` sitting next to source `.qmd` files) before
-re-rendering — a half-written scratch folder from an earlier failed or
-interrupted render is itself enough to cause the next render to fail with
-a confusing "file not found" error, independent of what caused the
-original failure.
+The fix is to keep `output-dir` inside `manuscript/` (it's just `output`
+now, not `../output` — see "Directory layout" above), not a `freeze`
+setting. Whatever the immediate symptom, delete any leftover intermediate
+files (`index_files/`, `*_files/`, stray `index.docx`/`index.html`/
+`index.typ` sitting next to source `.qmd` files) before re-rendering — a
+half-written scratch folder from an earlier failed or interrupted render
+is itself enough to cause the next render to fail with a confusing "file
+not found" error, independent of what caused the original failure.
 
 ### `.docx` "Word found unreadable content" on tables
 
@@ -307,23 +304,23 @@ the manuscript) makes Word show its "found unreadable content, click here
 to attempt recovery" prompt — but only when the caption renders *above*
 the table, which is docx's own default. This is an
 [upstream, still-open Quarto bug](https://github.com/quarto-dev/quarto-cli/issues/7321),
-not something specific to this template, and it's confirmed to affect
-`flextable` output (the table package this project uses throughout, see
-"R table packages" below). It was previously misdiagnosed here as fully
-fixed by the `output-dir` fix above — that fix was real and did resolve a
-genuine relationship-corruption bug, but this is a separate issue that
-came back later on unrelated renders.
+not something specific to this template, confirmed to affect `flextable`
+output (the table package this project uses throughout, see "R table
+packages" below). It was previously misdiagnosed here as fully fixed by
+the `output-dir` fix above — that fix was real and did resolve a genuine
+relationship-corruption bug, but this is a separate issue that came back
+later on unrelated renders.
 
 **Fix:** `manuscript/_quarto.yml` sets `tbl-cap-location: bottom` under
 `format.docx`, moving every docx table caption below its table — confirmed
-working by testing directly in Word. It's docx-only (html/typst are
-unaffected and still caption tables on top) and document-wide within docx
-— there's no way to keep top-captions for tables that aren't
-crossreferenced while fixing only the ones that are. If a "Word found
-unreadable content" prompt reappears on a table-heavy docx render despite
-this setting, check whether a new table format/package regressed the
-underlying upstream bug rather than assuming it's the `output-dir` issue
-again — they look similar but have different fixes.
+working by testing directly in Word. Docx-only (html/typst are unaffected
+and still caption tables on top) and document-wide within docx — no way
+to keep top-captions for tables that aren't crossreferenced while fixing
+only the ones that are. If a "Word found unreadable content" prompt
+reappears on a table-heavy docx render despite this setting, check
+whether a new table format/package regressed the underlying upstream bug
+rather than assuming it's the `output-dir` issue again — they look
+similar but have different fixes.
 
 ### `.docx` callout header can separate from its body across a page break
 
@@ -347,13 +344,13 @@ with debug output: at the default filter position it saw only the
 callout's unresolved title/body sub-content, and neither of Quarto's
 documented later filter-chain positions (`post-ast`, `post-quarto`) ever
 invoked the filter's AST callback at all in this Quarto version, so there
-was no reliable point at which to intercept the fully-resolved table and
-patch it. A working fix likely needs either an upstream Quarto change, or
-a post-processing step that edits the rendered `.docx`'s
-`word/document.xml` directly after `tar_quarto()` finishes (not attempted
-here — would need to be wired into `_targets.R` as a target that always
-reruns alongside `render_manuscript`, and re-verified after any Quarto
-upgrade since it'd depend on Quarto's current callout table XML shape).
+was no reliable point to intercept the fully-resolved table and patch it.
+A working fix likely needs either an upstream Quarto change, or a
+post-processing step editing the rendered `.docx`'s `word/document.xml`
+directly after `tar_quarto()` finishes (not attempted here — would need
+wiring into `_targets.R` as a target that always reruns alongside
+`render_manuscript`, and re-verifying after any Quarto upgrade, since it'd
+depend on Quarto's current callout table XML shape).
 
 **Workaround for now:** if a specific callout splits awkwardly in a real
 render, open it in Word, click into the header row's title text, and
@@ -374,24 +371,24 @@ processes**, not one:
    — also `PATH`-resolved, and not guaranteed to be the same R as #1.
 
 None of these three re-read `PATH` from a running session — a shell,
-Positron R console, or coding-assistant terminal that was already open
-when you changed `PATH` (e.g. installed a new R version) keeps resolving
-whatever it originally saw, even after a reboot, if that specific process
-wasn't actually closed and reopened. Confirmed directly: after removing an
-old R install and updating `PATH`, an already-running shell kept
-resolving the now-deleted `Rscript.exe` and failed with `Rscript: command
-not found`, while a fresh process using the full path to the same R
-install worked fine. This is also a likely contributor to orphaned
-intermediate/temp files turning up in unexpected places (a render started
-under one R/Quarto resolution, interrupted or mismatched partway through)
-— see the `output-dir` issue above.
+Positron R console, or coding-assistant terminal already open when you
+changed `PATH` (e.g. installed a new R version) keeps resolving whatever
+it originally saw, even after a reboot, unless that specific process was
+closed and reopened. Confirmed directly: after removing an old R install
+and updating `PATH`, an already-running shell kept resolving the
+now-deleted `Rscript.exe` and failed with `Rscript: command not found`,
+while a fresh process using the full path to the same R install worked
+fine. Also a likely contributor to orphaned intermediate/temp files
+turning up in unexpected places (a render started under one R/Quarto
+resolution, interrupted or mismatched partway through) — see the
+`output-dir` issue above.
 
 If something works in one session/terminal but not another with
-seemingly identical code: check what's actually being resolved *in the
-session having trouble* rather than assuming —
+seemingly identical code: check what's actually resolved *in the session
+having trouble* rather than assuming —
 `Sys.which("R")`/`Sys.which("Rscript")`/`Sys.which("quarto")` in R, or
 `where.exe Rscript`/`where.exe quarto` in a terminal. After changing an R
-or Quarto install, fully close and reopen every terminal/IDE window
-(a "reload window" in an IDE doesn't necessarily restart every background
+or Quarto install, fully close and reopen every terminal/IDE window (a
+"reload window" in an IDE doesn't necessarily restart every background
 process it spawned, e.g. a language server or persistent R session) —
 don't assume a reboot alone refreshed every already-running process.

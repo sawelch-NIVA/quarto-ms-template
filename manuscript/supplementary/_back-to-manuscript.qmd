@@ -1,26 +1,22 @@
 <!-- manuscript/supplementary/_back-to-manuscript.qmd ----
-     Shared include partial - leading underscore keeps Quarto's
-     website-project renderer from also rendering this as its own page
-     (see "Directory layout" in CLAUDE.md/README.md). html readers get
-     the sidebar nav for free, so this is hidden there; docx/typst readers
-     of a supplementary notebook have no nav at all, so they need an
-     explicit way back to the manuscript. Reads MANUSCRIPT_BASENAME
-     (R/functions.R) instead of hardcoding "index" here, so a future
-     rename of manuscript.qmd only needs updating in one place.
+     Shared include partial - leading underscore keeps Quarto's website
+     renderer from also rendering this as its own page (see "Directory
+     layout" in CLAUDE.md/README.md). html readers get the sidebar nav
+     for free, so this is hidden there; docx/typst readers of a
+     supplementary notebook have no nav, so they need an explicit way
+     back. Reads MANUSCRIPT_BASENAME (R/functions.R) instead of
+     hardcoding "index", so renaming manuscript.qmd only needs updating
+     one place.
 
-     Uses here::here(), not a cwd-relative path - confirmed by direct
-     testing that manuscript/_quarto.yml's execute-dir: project does NOT
-     reliably mean cwd = manuscript/ during chunk execution: a plain
-     `quarto render manuscript` has cwd = manuscript/ at execute time, but
-     the exact same project rendered via tarchetypes::tar_quarto() (this
-     project's actual render_manuscript target) has cwd = the REPO ROOT
-     instead - reproduced with a getwd()/list.files() dump inside this
-     chunk under both invocation paths. here::here() works correctly
-     either way because it resolves via upward sentinel-file search
-     (finds this repo's .git) rather than trusting cwd, and because the
-     including file's own here::i_am() call (in its setup chunk, which
-     must run before this include - see each notebook's chunk order) has
-     already anchored it for this session by the time this chunk runs. -->
+     Uses here::here(), not a cwd-relative path - confirmed that
+     execute-dir: project does NOT reliably mean cwd = manuscript/ during
+     chunk execution: a plain `quarto render manuscript` has cwd =
+     manuscript/, but this project's actual tar_quarto() render has cwd =
+     the repo root instead (reproduced with a getwd()/list.files() dump
+     under both invocation paths). here::here() works either way since it
+     resolves via upward sentinel-file search, not cwd, and the including
+     file's own here::i_am() call (in its setup chunk, which must run
+     before this include) has already anchored it for this session. -->
 
 ::: {.content-hidden when-format="html"}
 
