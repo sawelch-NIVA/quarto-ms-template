@@ -8,7 +8,21 @@ title: "Manuscript Title"
 date: today
 abstract: |
   Write a short abstract of the manuscript here.
+# Scoped here, not project-wide in _quarto.yml - see the comment there
+# for the real CI-confirmed bug this avoids for every other notebook.
+bibliography: references.bib
+csl: styles/apa.csl # other styles at https://github.com/citation-style-language/styles
 ---
+
+::: {.callout-info}
+## The Whole Game
+
+I like writing manuscripts with Quarto. I also hate writing manuscripts with Quarto. (ditto `targets` for analysis pipelines) There's more to go wrong, and Murphy's law, it will. Every fix to an issue will introduce two more problems. What's the solution? Don't try and figure out how to write a manuscript in Quarto while writing a manuscript. Then you have two problems, and they're competing for your attention.
+
+This repo is my (mainly Claude Code, to be honest) attempt to front-load all the frustrations and unexpected interactions of working with Quarto and targets, and to get out something that I like but is still acceptable to my Word-using colleagues. The emphasis is on empiricism, that is, we take nothing for granted and run everything ourselves (every version) to make sure it works. 
+
+I plan to use it as a combination template and testbed for my favourite R and other packages. This means I'm *still* trying to do two things at once, which may turn out to be a mistake. Quarto 2 will probably break all of this when it comes out, but until then, here we are. Please feel free to reuse and critique. I don't know if this'll really be useful to anyone else, but let me know if it is!
+:::
 
 # Introduction {#sec-intro}
 

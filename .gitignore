@@ -5,6 +5,7 @@
 
 **/.quarto/
 **/*.quarto_ipynb
+**/*.rmarkdown
 
 # Not root-anchored: output-dir must resolve inside manuscript/'s own
 # project directory (manuscript/output/), not the repo root - see
@@ -27,3 +28,5 @@ meta/*
 # directories with intermediate images in them.
 **/figure-typst/*
 
+
+/.quarto/

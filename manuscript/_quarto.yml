@@ -110,18 +110,21 @@ format:
   typst:
     number-sections: true
 
-# Must resolve INSIDE manuscript/ - confirmed by direct testing that
-# `../references.bib` (reaching outside this project's own root) hard-
-# errors typst specifically: `error: failed to load file (access denied)
-# ... cannot read file outside of project root`. Same underlying
-# constraint as output-dir above, just hit via a different config key -
-# typst's own sandbox refuses to read anything outside the Quarto project
-# root, regardless of which setting tries to point there. Quarto Wingman /
-# Zotero for Quarto defaults to writing bibliography exports at the repo
-# root, not here - see .vscode/settings.json's zoteroForQuarto.bibFile and
-# CLAUDE.md's "Citations" note for why that's set at the workspace level.
-bibliography: references.bib
-csl: styles/apa.csl # other styles at https://github.com/citation-style-language/styles
+# bibliography/csl deliberately NOT set here at project level - confirmed
+# by direct testing (real CI failure, not local) that a project-wide csl:
+# makes Quarto compute a relative "path to styles/apa.csl" for every
+# single document, including ones with no citations at all, and that
+# computation is buggy for any document nested below the project root
+# (manuscript/supplementary/*.qmd): it emits a stray leading backslash -
+# `#set bibliography(style: "\../styles/apa.csl")` - which newer typst
+# versions hard-error on (`path must not contain a backslash`), while the
+# older typst bundled with this project's local Quarto silently tolerated
+# it (that version difference is exactly why this never showed up
+# locally, only in CI once quarto-actions/setup installed the latest
+# release). Scoped instead to manuscript.qmd's own frontmatter below,
+# the only document that actually has a real `::: {#refs} :::` block -
+# any future notebook that adds real citations needs to add its own
+# bibliography:/csl: too, same pattern, not rely on a project default.
 
 fig-width: 6
 fig-height: 4
