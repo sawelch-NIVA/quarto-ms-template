@@ -3,14 +3,16 @@
 Deferred items, not urgent - noted here instead of GitHub Issues since
 this is currently a single-maintainer template repo.
 
-- **CI hung for ~3h on the first real run, cancelled by hand** - hung at
-  `render_manuscript`, almost certainly the mermaid→docx/typst headless
-  Chrome step (see manuscript/supplementary/ci-pipeline.qmd's "A real CI
-  failure"). Mitigated with `timeout-minutes: 15` (confirmed effective -
-  it's just a time cap) and a `quarto install chrome-headless-shell`
-  pre-install step (hypothesis fix, NOT yet confirmed to solve the actual
-  hang - only that the download itself works). **Check the next CI run's
-  Actions tab before assuming this is fixed.**
+- ~~CI hung for ~3h on the first real run~~ - **resolved**: the
+  `quarto install chrome-headless-shell` pre-install fix worked, confirmed
+  by an actual successful CI run. `timeout-minutes: 15` stays as a
+  permanent safety net regardless.
+- **`manuscript/index.qmd`'s redirect requires a manual click-through**
+  (the `<meta http-equiv="refresh">` stub at the Pages site root) - works,
+  but not ideal UX. No easy fix identified yet; revisit if it becomes
+  annoying enough to research properly (a server-side redirect isn't
+  available on GitHub Pages for a project page without a custom
+  `_redirects`-style host feature, which Pages doesn't support).
 - **`execute: freeze` setting is unsettled.** `manuscript/_quarto.yml`
   currently uses `freeze: false` (never freeze, always re-execute) rather
   than `freeze: auto`, deliberately, to sidestep a staleness bug found

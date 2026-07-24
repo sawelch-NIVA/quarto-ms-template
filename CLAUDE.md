@@ -332,11 +332,29 @@ Full writeup lives in the notebook; headline findings:
   I/O side effects, not a function library).
 - `tarchetypes::tar_quarto()`'s dependency-scanning pass evaluates chunk
   options like `eval: !expr is_html` without running the setup chunk
-  first, so you'll see harmless `Error in eval(x, envir = envir) : object
-  'is_html' not found` messages during `tar_make()` even on a successful
-  build. Not fatal — the actual quarto CLI subprocess render (which does
-  run setup first) determines success. Don't chase this as a real error;
-  check the final `✔ render_manuscript completed` / exit code instead.
+  first, printing a harmless `Error in eval(x, envir = envir) : object
+  'is_html' not found` for every such chunk across every `.qmd` (five, for
+  `tables-mre.qmd` alone) — during pipeline *definition* (evaluating
+  `_targets.R`'s `list(...)`), not the render itself, confirmed by
+  reproducing it with a bare `source("_targets.R")`. Not fatal — the
+  actual quarto CLI subprocess render (which does run setup first)
+  determines success.
+  **Now suppressed**, not just tolerated: `quiet_quarto_scan()`
+  (`R/functions.R`) wraps the `tar_quarto()` call in `_targets.R` with
+  `sink(type = "message")`. Confirmed by testing that `suppressMessages()`
+  around the same call does **not** catch this text — it's written via
+  `try(silent = FALSE)` straight to the stderr connection, not through
+  R's `message()`/`warning()` condition system, so only a `sink()`-based
+  redirect of that connection works. A real error during this scan still
+  raises a `stop()`-class condition and halts the pipeline normally,
+  unaffected by the sink — only the raw stderr noise is discarded.
+  Same root cause as `here::i_am()`'s own noise in `_targets.R`: `here`
+  actually prints its "here() starts at ..." message **twice** per call —
+  once from `library(here)`'s own package-attach message
+  (`packageStartupMessage()`, needs `suppressPackageStartupMessages()`),
+  once from `i_am()` itself (a real `message()`, needs
+  `suppressMessages()`) — confirmed by testing each in isolation; either
+  suppressor alone leaves one copy printing.
 - **Quarto's website render deletes anything under `output-dir` it doesn't
   recognize as its own output** — confirmed by direct testing: a stray file
   and an entire unrelated subdirectory placed directly under `output/`

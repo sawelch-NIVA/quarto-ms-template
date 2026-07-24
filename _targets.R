@@ -3,11 +3,14 @@
 
 library(targets)
 library(tarchetypes) # tar_quarto() and friends
-library(here) # anchors paths to the project root regardless of invocation cwd
+# here's own package-attach message and i_am()'s message are two separate
+# prints (confirmed by testing) - suppressed here since this runs on every
+# tar_make(), not just once; both are pure noise once the root is correct.
+suppressPackageStartupMessages(library(here))
 
 # Anchors here()'s root independent of .git/.Rproj auto-detection - matters
 # if this template is ever unzipped rather than git-cloned.
-here::i_am("_targets.R")
+suppressMessages(here::i_am("_targets.R"))
 
 tar_option_set(
   packages = c("tibble"), # packages targets need for their tasks
@@ -95,10 +98,15 @@ list(
   # {{< include >}}'d partials, so render_manuscript correctly depends on
   # tbl_01_example/fig_01_example even though they're only referenced
   # inside those partials, not manuscript.qmd itself.
-  tar_quarto(
+  # quiet_quarto_scan() (R/functions.R) discards the "Error in eval: object
+  # 'is_html' not found" noise this scan prints for every eval: !expr
+  # is_html-style chunk across every .qmd - confirmed harmless, see
+  # "Pipeline gotchas" in CLAUDE.md; a real error here still stops the
+  # pipeline as normal, only the raw stderr text is suppressed.
+  quiet_quarto_scan(tar_quarto(
     name = render_manuscript,
     path = "manuscript",
     execute = TRUE, # keep this unless you know you've just changed text, not code,
     quiet = TRUE # set to true to get better logs if anything fails
-  )
+  ))
 )

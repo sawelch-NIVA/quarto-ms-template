@@ -61,6 +61,35 @@ detect_render_format <- function() {
   )
 }
 
+# --- Pipeline-definition noise ------------------------------------------
+
+#' Suppress raw stderr noise from tar_quarto()'s dependency-scanning pass
+#'
+#' tarchetypes::tar_quarto()'s dependency scanner evaluates chunk options
+#' like `eval: !expr is_html` in every source .qmd, before any setup chunk
+#' has run, to look for tar_read()/tar_load() calls hidden inside them -
+#' confirmed harmless (see CLAUDE.md's "Pipeline gotchas"), but the
+#' resulting "Error in eval(x, envir = envir): object 'is_html' not found"
+#' text goes straight to stderr via `try(silent = FALSE)`, not through
+#' message()/warning() - confirmed by testing that suppressMessages()
+#' around the same tar_quarto() call does NOT catch it, while
+#' sink(type = "message") does, since that's the connection try() writes
+#' to. A real problem during this scan still raises a stop()-class
+#' condition, which propagates through this wrapper exactly as if it
+#' weren't there - only the raw stderr text is discarded, not real errors.
+quiet_quarto_scan <- function(expr) {
+  con <- file(nullfile(), open = "wt")
+  on.exit(
+    {
+      sink(type = "message")
+      close(con)
+    },
+    add = TRUE
+  )
+  sink(con, type = "message")
+  force(expr)
+}
+
 # --- Standalone submission exports --------------------------------------
 # Some journals require every table/figure as its own named file
 # (tbl-01-*.docx, fig-01-*.tif) in addition to the embedded manuscript
