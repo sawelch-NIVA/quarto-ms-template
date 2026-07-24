@@ -39,6 +39,12 @@ here::i_am("manuscript/supplementary/ci-pipeline.qmd")
   be cancelled by hand** - see "A real CI failure" below. `timeout-minutes:
   15` now caps that, and an explicit `quarto install chrome-headless-shell`
   step is a hypothesis fix for the actual cause, not yet confirmed working.
+- **On push to `main` only**, a second `deploy` job publishes
+  `manuscript/output/` to GitHub Pages via the Actions-native artifact
+  deploy (`upload-pages-artifact` + `deploy-pages`), not a `gh-pages`
+  branch - see "Publishing to GitHub Pages" below for why, and why
+  switching to the branch approach later would be cheap if that tradeoff
+  ever stops making sense.
 :::
 
 # Why this notebook exists
@@ -56,9 +62,9 @@ introduced, not whenever someone next happened to render typst.
 
 ```{mermaid}
 %%| label: fig-ci-flowchart
-%%| fig-cap: "One push, one clean-room rebuild of the whole pipeline"
+%%| fig-cap: "One push, one clean-room rebuild - deploy only on main"
 flowchart TD
-    A[push / pull_request] --> B["checkout"]
+    A[push / pull_request / workflow_dispatch] --> B["checkout"]
     B --> C["setup-r + setup-r-dependencies<br/>(installs R packages + Ubuntu sysreqs)"]
     C --> D["quarto-actions/setup<br/>(installs Quarto CLI)"]
     D --> E["quarto install chrome-headless-shell"]
@@ -66,7 +72,11 @@ flowchart TD
     F --> G["testthat::test_dir()"]
     G --> H["source data-raw/import-data.R"]
     H --> I["targets::tar_make()"]
-    I --> J["upload manuscript/output/ as an artifact"]
+    I --> J["upload manuscript/output/ as a debug artifact"]
+    I --> K{"push to main?"}
+    K -->|yes| L["upload-pages-artifact"]
+    K -->|no, e.g. a PR| M["stop - render job ends here"]
+    L --> N["deploy job: deploy-pages"]
 ```
 
 Each step, and why it's there:
@@ -107,6 +117,51 @@ Each step, and why it's there:
    (e.g. html/docx present, typst missing after a hard failure) is
    downloadable from the workflow run for debugging, not just a red X with
    no further detail.
+10. **`actions/upload-pages-artifact`**, gated to `main` and never a PR -
+    see "Publishing to GitHub Pages" below.
+
+# Publishing to GitHub Pages
+
+`manuscript/output/` also gets deployed to GitHub Pages, but only on push
+to `main` (or a manual `workflow_dispatch` run) - a PR renders and tests
+the pipeline like any other push, but never touches the live site.
+
+**Why the Actions-native artifact deploy, not a `gh-pages` branch:** the
+classic pattern is a dedicated `gh-pages` branch, with every deploy adding
+a commit of built HTML/CSS/JS - diffable and revertable with plain git,
+but it bloats `.git` over time with binary-ish churn and needs its own
+branch-protection thinking. GitHub's newer Actions-native deploy
+(`upload-pages-artifact` + `deploy-pages`) skips the branch entirely -
+deployments are tracked in GitHub's own Pages history instead of git log,
+and nothing rendered is ever committed. Chosen here because the `render`
+job already produces `manuscript/output/` on every push regardless of
+Pages, so reusing it costs two extra steps instead of a second full
+render.
+
+This isn't a one-way door: the two approaches share no state (nothing
+rendered is committed either way), so switching to
+`quarto-dev/quarto-actions/publish@v2` and a `gh-pages` branch later - if,
+say, the git-diffable history of past renders turns out to matter, or a
+future Quarto major version changes the calculus - is just deleting the
+`deploy` job and the `upload-pages-artifact` step, adding the publish
+action instead, and flipping Pages' source setting from "GitHub Actions"
+back to "Deploy from a branch."
+
+**Split into two jobs, not one:** `deploy` runs `needs: render`,
+separately from the `render` job itself, because `actions/deploy-pages`
+needs its own `permissions: pages: write, id-token: write` and an
+`environment: github-pages` binding to authenticate the deployment -
+scoping those permissions to a dedicated job keeps the main `render` job
+(which checks out a PR's arbitrary code) from ever holding write access to
+the live site.
+
+**Not independently confirmed in this session:** the `render` job's
+`upload-pages-artifact` step and the `deploy` job's `deploy-pages` step
+haven't been observed running in actual CI yet - only that the YAML is
+syntactically valid and the logic (main-only, needs: render) matches the
+documented pattern for this deploy method. Push and check the Pages
+deployment (Settings → Pages, or the environment's deployment history)
+before assuming the live site is actually up to date.
 
 # A real CI failure
 

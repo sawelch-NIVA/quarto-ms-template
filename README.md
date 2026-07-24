@@ -126,11 +126,15 @@ a bug, and doesn't affect the docx copy.
 `.github/workflows/render.yml` runs `targets::tar_make()` on every push and
 PR — a fresh-clone rebuild on a machine that isn't anyone's local setup,
 catching the class of bug this template has otherwise found by hand (docx
-corruption, one bad image format silently stalling html/docx too). See
+corruption, one bad image format silently stalling html/docx too). On push
+to `main` only, it also deploys `manuscript/output/` to GitHub Pages
+(Actions-native artifact deploy, not a `gh-pages` branch — PRs render and
+test but never publish). See
 [`manuscript/supplementary/ci-pipeline.qmd`](manuscript/supplementary/ci-pipeline.qmd)
-for the full writeup, including what it doesn't do (no caching, so every
-run is a genuinely clean rebuild) and what hasn't actually been observed
-running in CI yet versus what's been confirmed locally.
+for the full writeup, including why that deploy method was chosen over the
+classic branch, what it doesn't do (no caching, so every run is a
+genuinely clean rebuild), and what hasn't actually been observed running
+in CI yet versus what's been confirmed locally.
 
 ## Adding a notebook
 

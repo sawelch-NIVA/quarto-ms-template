@@ -6,11 +6,22 @@ name: Render manuscript
 # render that works locally but not from a clean checkout) automatically,
 # instead of only when someone remembers to render all three formats. See
 # manuscript/supplementary/ci-pipeline.qmd for the full writeup.
+#
+# On push to main only, also deploys manuscript/output/ to GitHub Pages
+# (Settings → Pages → Source: GitHub Actions, already enabled) via the
+# artifact-based deploy, not a gh-pages branch - chosen for no git-history
+# bloat from rendered output; cheap to swap for quarto-actions/publish
+# later if that tradeoff ever stops making sense, since the two approaches
+# don't share any state. PRs render and test but never deploy.
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch: # manual redeploy button, no empty commit needed
+
+permissions:
+  contents: read
 
 jobs:
   render:
@@ -102,3 +113,29 @@ jobs:
           name: manuscript-output
           path: manuscript/output/
           if-no-files-found: ignore
+
+      # Separate from the debug artifact above - upload-pages-artifact
+      # packages output specifically for actions/deploy-pages in the
+      # deploy job below. Only on a real render (no if: always()) and only
+      # for main/dispatch, never PRs - a broken render shouldn't publish,
+      # and a PR shouldn't touch the live site at all.
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: manuscript/output/
+
+  deploy:
+    needs: render
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
