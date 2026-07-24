@@ -60,9 +60,11 @@ required_pkgs <- c(
   "DiagrammeR",
   # Used by supplementary/colour-mre.qmd - drop if you delete that
   # notebook. RColorBrewer/viridis/colorspace/scales are already pulled in
-  # by other notebooks above; scico and MetBrewer are new here.
+  # by other notebooks above; scico, MetBrewer, and paletteer are new
+  # here.
   "scico",
   "MetBrewer",
+  "paletteer",
   # Used by tests/testthat/ - see manuscript/supplementary/testing-mre.qmd.
   "testthat",
   "withr"

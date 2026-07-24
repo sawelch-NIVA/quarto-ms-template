@@ -28,6 +28,7 @@ library(viridis)
 library(scico)
 library(colorspace)
 library(MetBrewer)
+library(paletteer)
 library(here)
 here::i_am("manuscript/supplementary/colour-mre.qmd")
 
@@ -57,6 +58,14 @@ set.seed(42)
   `scale_*_steps2()`, and colorspace's `diverging_hcl` converge on nearly
   the same result** — the specific package matters less than getting
   that structure right.
+- **`paletteer` consolidates RColorBrewer/viridis/scico/MetBrewer/and
+  thousands more behind one interface** — but confirmed it is not a
+  strictly identical drop-in for the source package: the same
+  `MetBrewer::Hokusai1` palette silently dropped an 8th category (blank
+  bar, no warning) through `paletteer`'s default settings, while calling
+  `MetBrewer::met.brewer(..., 8)` directly interpolated to fill it. Check
+  a palette's actual length through `paletteer` before trusting it with
+  more categories than its source package would give it credit for.
 - **`colorspace::lighten()`/`darken()` can derive a whole coherent
   palette family from one base hue per group** — the pattern from the
   script that prompted this notebook, reproduced below.
@@ -135,8 +144,18 @@ region_mult <- c(Coastal = 0.8, Upland = 0.5, Urban = 1.8, Agricultural = 1.3)
 
 water_quality <- tibble(
   site_id = sample(sprintf("S%03d", 1:60), 1200, replace = TRUE),
-  region = sample(regions, 1200, replace = TRUE, prob = c(.3, .2, .25, .25)),
-  matrix = sample(matrices, 1200, replace = TRUE, prob = c(.4, .25, .25, .1)),
+  region = sample(
+    regions,
+    1200,
+    replace = TRUE,
+    prob = c(0.3, 0.2, 0.25, 0.25)
+  ),
+  matrix = sample(
+    matrices,
+    1200,
+    replace = TRUE,
+    prob = c(0.4, 0.25, 0.25, 0.1)
+  ),
   analyte = sample(analytes, 1200, replace = TRUE),
   date = as.Date("2023-01-01") + sample(0:730, 1200, replace = TRUE)
 ) |>
@@ -340,6 +359,91 @@ d4 <- p_div_base +
   getting that structure right**, which matches this skill's own
   general colour rule: sequential is one hue light-to-dark, diverging is
   two hues plus a neutral midpoint, never a hue *at* the midpoint.
+
+# Don't reinvent the wheel: `paletteer`
+
+Everything above meant installing and remembering a different function
+for each package (`scale_fill_brewer()`, `scale_fill_viridis_d()`,
+`MetBrewer::met.brewer()`, `colorspace::qualitative_hcl()`, ...).
+[`paletteer`](https://github.com/EmilHvitfeldt/paletteer) (Emil
+Hvitfeldt) consolidates essentially all of them — RColorBrewer, viridis,
+scico, MetBrewer, and several thousand more palettes from dozens of
+other packages — behind one interface: `paletteer_d()`/`paletteer_c()`/
+`paletteer_dynamic()` for raw colour vectors, and matching
+`scale_*_paletteer_d()`/`_c()`/`_dynamic()` ggplot2 scales, all addressed
+by a single `"package::palette"` string.
+
+```{r}
+#| label: fig-paletteer-equivalence
+#| fig-cap: "Same MetBrewer palette used earlier, reached through paletteer instead - note the missing Chloride bar/legend swatch"
+#| fig-width: 8
+#| fig-height: 4
+ggplot(water_quality, aes(wt = concentration, x = analyte, fill = analyte)) +
+  geom_bar(position = "fill") +
+  paletteer::scale_fill_paletteer_d("MetBrewer::Hokusai1") +
+  coord_flip() +
+  theme_minimal(base_size = 10) +
+  labs(
+    title = "MetBrewer's Hokusai1, via paletteer::scale_fill_paletteer_d()",
+    x = NULL,
+    y = NULL
+  )
+```
+
+::: {.callout-warning}
+## Found while testing: paletteer silently dropped the 8th category, no warning printed
+
+That figure has a real bug in it, left in deliberately rather than
+quietly fixed - **Chloride's bar and legend swatch are both blank**.
+`water_quality$analyte` has 8 levels; `Hokusai1` has 7 native colours
+(`length(paletteer::paletteer_d("MetBrewer::Hokusai1"))` confirms it);
+`scale_fill_paletteer_d()`'s default `dynamic = FALSE` uses exactly the
+native palette and leaves anything past its length unmapped (`NA` fill,
+rendered as blank) — with no console warning at all. Compare this to the
+very first figure in this notebook, which called
+`MetBrewer::met.brewer("Hokusai1", 8)` **directly** and got all 8
+colours (it interpolates by default when asked for more than the
+palette's native count) - **the same nominal palette behaves differently
+depending on which interface reaches it.**
+
+Both obvious fixes were tried and both failed, informatively:
+
+- `paletteer::paletteer_d("MetBrewer::Hokusai1", n = 8)` — hard error:
+  `` `n` must be a whole number between 1 and 7, not the number 8 ``. At
+  least this one fails loudly rather than silently.
+- `scale_fill_paletteer_d("MetBrewer::Hokusai1", dynamic = TRUE)` —
+  a *different* hard error: `Palette "MetBrewer::Hokusai1" not found`.
+  `dynamic = TRUE` only works for palettes paletteer has separately
+  registered as interpolation-capable, not every discrete palette in its
+  collection — and the error message doesn't say that, it looks
+  identical to a genuine typo in the palette name.
+
+**Practical takeaway**: don't assume a palette reached through paletteer
+extends to fit your data just because the same palette's own package
+does it directly. Check `length(paletteer::paletteer_d("pkg::palette"))`
+against your actual category count before trusting
+`scale_*_paletteer_d()` with more levels than that, and don't reach for
+`dynamic = TRUE` as a general-purpose fix — it's palette-specific, and
+its own error message won't tell you that.
+:::
+
+**What this does and doesn't replace**: `paletteer` solves the
+*access* problem (five packages, five function signatures, five sets of
+palette names to remember) — it doesn't replace any judgement from the
+rest of this notebook. A palette pulled through `paletteer` is exactly
+as (un)safe for CVD, exactly as prone to a "looks fine at a glance"
+midpoint problem in a diverging scale, as the same palette pulled
+directly from its source package, because it *is* the same palette. Run
+the same checks (this notebook's CVD-simulation section, in particular)
+regardless of which interface fetched the colours.
+
+**For browsing before committing to one**: Yan Holtz's
+[R Color Palette Finder](https://r-graph-gallery.com/color-palette-finder.html),
+built around `paletteer`'s ~2,700-palette collection, previews any
+palette against seven real chart types, filters by categorical/
+continuous and by length, and flags colourblind-friendly options — worth
+using before hand-picking swatches the way the "thematic" palette below
+was picked (see what that got tested against).
 
 # Deriving coherent palette families with `colorspace::lighten()`
 

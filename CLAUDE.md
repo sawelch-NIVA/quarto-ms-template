@@ -477,7 +477,30 @@ Full writeup lives in the notebook; headline findings:
 - **New dependencies**: `scico` and `MetBrewer` weren't previously used
   anywhere in this template — both added to `R/required_packages.R`
   (the single source of truth introduced after the `ggraph`/CI incident
-  — see "Pipeline gotchas" below) rather than repeating that gap.
+  — see "Pipeline gotchas" below) rather than repeating that gap. Same
+  for `paletteer`, added when it was.
+- **`paletteer` (Emil Hvitfeldt) consolidates RColorBrewer/viridis/
+  scico/MetBrewer/and thousands more behind one interface
+  (`paletteer_d()`/`_c()`/`_dynamic()`, matching `scale_*_paletteer_*()`
+  ggplot2 scales) — confirmed it pulls the same underlying palette data
+  as the source package, but confirmed it is NOT a strict drop-in
+  equivalent**: `scale_fill_paletteer_d("MetBrewer::Hokusai1")` against
+  8 categories silently left the 8th unmapped (blank fill, no console
+  warning), while calling `MetBrewer::met.brewer("Hokusai1", 8)`
+  directly interpolated to fill all 8 — the same nominal palette behaves
+  differently depending on which interface reaches it. `paletteer_d(...,
+  n = 8)` hard-errors (`n` capped at the palette's native length, 7);
+  `dynamic = TRUE` doesn't fix it either and fails with an unrelated-looking
+  "palette not found" error, because dynamic interpolation is only
+  supported for palettes paletteer has separately registered as
+  interpolation-capable, not every discrete palette in its collection.
+  Check `length(paletteer::paletteer_d("pkg::palette"))` against your
+  actual category count before trusting a `scale_*_paletteer_d()` call
+  with more levels than that. For browsing before committing to a
+  palette: [R Color Palette Finder](https://r-graph-gallery.com/color-palette-finder.html)
+  (Yan Holtz, built around `paletteer`'s ~2,700-palette collection) —
+  previews any palette against real chart types and filters by type/
+  length/colourblind-friendliness.
 
 ### Pipeline gotchas
 - `tar_source()` sources every `.R` file directly under `R/` on every
