@@ -104,6 +104,16 @@ format:
   typst:
     number-sections: true
 
+# Must resolve INSIDE manuscript/ - confirmed by direct testing that
+# `../references.bib` (reaching outside this project's own root) hard-
+# errors typst specifically: `error: failed to load file (access denied)
+# ... cannot read file outside of project root`. Same underlying
+# constraint as output-dir above, just hit via a different config key -
+# typst's own sandbox refuses to read anything outside the Quarto project
+# root, regardless of which setting tries to point there. Quarto Wingman /
+# Zotero for Quarto defaults to writing bibliography exports at the repo
+# root, not here - see .vscode/settings.json's zoteroForQuarto.bibFile and
+# CLAUDE.md's "Citations" note for why that's set at the workspace level.
 bibliography: references.bib
 csl: styles/apa.csl # other styles at https://github.com/citation-style-language/styles
 

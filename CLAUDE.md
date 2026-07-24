@@ -73,6 +73,9 @@ manuscript/      a SELF-CONTAINED Quarto project, one level below the repo root 
                    `output`, i.e. manuscript/output/) — see the warning below,
                    this isn't a style preference.
   manuscript.qmd   the manuscript
+  index.qmd        html-only redirect stub to manuscript.html - see
+                   "GitHub Pages" below for why this exists explicitly
+                   rather than relying on Quarto's own auto-generated one
   tables/          one build file (tbl-NN-slug.R) + include partial
                    (_tbl-NN-slug.qmd) per table — see "Standalone submission
                    exports" below
@@ -110,6 +113,22 @@ and direct inspection of the docx's internal OOXML
 (`[Content_Types].xml`, `document.xml`, `_rels/document.xml.rels` —
 checked for well-formedness and that every `r:id`/`r:embed` reference
 resolves to an existing relationship target) came back clean.
+
+**The same constraint bit `bibliography:` too, not just `output-dir`.**
+`manuscript/_quarto.yml` briefly pointed `bibliography: ../references.bib`
+at a `references.bib` that had ended up at the repo root (Quarto Wingman /
+Zotero for Quarto's default write location, not this project's actual
+bibliography path) — confirmed by direct testing that this hard-errors
+typst specifically: `error: failed to load file (access denied) ... cannot
+read file outside of project root`. Not a separate bug, the same one:
+typst's own sandbox refuses to read anything outside the Quarto project
+root (`manuscript/`), regardless of which config key tries to reach
+outside it. Fix: the real `references.bib` now lives at
+`manuscript/references.bib` (moved there, not duplicated), and
+`bibliography: references.bib` in `manuscript/_quarto.yml` resolves inside
+the project root like every other path here has to. See README.md's "Citations" section for the Quarto Wingman side of this
+(its own default write location is now pinned via `.vscode/settings.json`,
+not left to each contributor's own global setting).
 
 **A second, separate docx "Word found unreadable content" bug recurred
 after the output-dir fix above — don't assume that fix covers every table
@@ -435,6 +454,30 @@ likely-related instance of this same staleness surfaced later as a
 recurring typst bug in `manuscript/supplementary/tables-mre.qmd` (font
 warnings plus a hard `file not found` error for a `_files/` image that
 should have existed) — see "Why `manuscript/` is isolated" above.
+
+### GitHub Pages: the auto-generated index redirect isn't deterministic
+Without an explicit `index.qmd`, Quarto's website renderer auto-generates
+an `index.html` that's a client-side redirect to whichever page it treats
+as the site's front matter — confirmed NOT deterministic across
+environments. A local Windows render's auto-generated `index.html`
+redirected to `manuscript.html` (correct); the same commit's CI (Ubuntu)
+build, deployed live to GitHub Pages, redirected to
+`supplementary/tables-mre.html` instead — confirmed by fetching the live
+page directly, not a caching artifact or guess. Whatever Quarto actually
+keys this choice on (sidebar order, file-system enumeration order,
+render-completion order — not determined here), it isn't stable between
+platforms for this project.
+
+**Fix:** `manuscript/index.qmd` now exists explicitly, with a real
+`<meta http-equiv="refresh" content="0; url=manuscript.html">` redirect —
+this removes Quarto's guesswork entirely rather than trying to influence
+it. Set `format: html` in its frontmatter (overriding the project-wide
+`format:` list for just this one document) since a raw HTML meta-refresh
+tag has no meaning in docx/typst and there's no "site root" concept to
+redirect from in either — confirmed this correctly suppresses
+`index.docx`/`index.pdf` from being generated at all, leaving only
+`index.html`. Not added to the sidebar `contents:` list, same as a scratch
+notebook — it's a redirect hop, not a page meant to be browsed directly.
 
 ## Known drift to watch for
 

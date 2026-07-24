@@ -1,0 +1,19 @@
+---
+# Without an explicit index.qmd, Quarto auto-generates a redirect stub for
+# the site root - confirmed NOT deterministic across environments: a local
+# Windows render pointed it at manuscript.html, the same commit's CI
+# (Ubuntu) build pointed it at supplementary/tables-mre.html instead, live
+# on GitHub Pages. This file replaces that guesswork with an explicit,
+# deterministic redirect. Not linked from the sidebar nav (like a scratch
+# notebook) - it's just the / -> manuscript.html hop, not a page to browse.
+title: "Redirecting to the manuscript…"
+# html only - a raw <meta> redirect has no meaning in docx/typst, and
+# there's no equivalent "site root" concept to redirect from in either.
+# format: html here overrides the project-wide format: list (html + docx
+# + typst) for just this one document.
+format: html
+---
+
+<meta http-equiv="refresh" content="0; url=manuscript.html">
+
+If you are not redirected automatically, [click here](manuscript.html).

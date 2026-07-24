@@ -4,9 +4,7 @@
 # outputs via tar_read()/tar_load(), so a direct render can use stale or
 # missing data.
 title: "Manuscript Title"
-author:
-  - name: "Your Name"
-    affiliation: "Your Institution"
+# set author and affiliations in _quarto.yml
 date: today
 abstract: |
   Write a short abstract of the manuscript here.
@@ -14,7 +12,15 @@ abstract: |
 
 # Introduction {#sec-intro}
 
-Write your introduction here, citing sources as needed [@example2024].
+Write your introduction here, citing sources as needed [@example2024]. I personally prefer to use [Quarto Wingman](https://github.com/ntluong95/quarto-wingman)'s citation functionality, which hooks into the existing Zotero API and is very fast. Here are some more citations: [@hetheringtonTwoThreeFourAtom1975; @hartiganDipTestUnimodality1985; @tongEyesWideShut2024]:
+
+`@example2024` - appears as @example2024
+`[@example2024]` - appears as [@example2024]
+`[@example2024; @hetheringtonTwoThreeFourAtom1975]` - appears as [@example2024; @hetheringtonTwoThreeFourAtom1975]
+
+Note that depending on how you're handling your citation keys in Zotero, they may turn up as `nameYear` or `nameTitleTitleTitleYear` or whatever custom choice you set your BibTex keys to. 
+
+Citations added inline are generally also added to your default or document-specific references file (set in [_quarto.yml](_quarto.yml), in this repo, `references.bib`, or the document frontmatter). Do note that because they're indexed by citation key, if you switch format part-way through you may end up with duplicate entries. 
 
 ```{r}
 #| label: setup
@@ -45,7 +51,7 @@ ext <- fmt$ext
 
 # Methods
 
-We can add full-line equations with `\$\$` and reference them [@eq-poisson]. This uses... LatEX? Mathjax? Note that inline code fences don't get any special styling in Word. 
+We can add full-line equations with `\$\$` and reference them [@eq-poisson]. By default, they are rendered by MathJaX (what version? from where?).
 
 $$
 p(x) = \frac{e^{-\lambda} \lambda^{x}}{x !}
@@ -53,7 +59,7 @@ $$ {#eq-poisson}
 
 # Results
 
-You can refer back to sections [@sec-intro] We had to put `{#sec-intro}` after "Introduction" in the header above.
+You can refer back to sections [@sec-intro]. We had to put `{#sec-intro}` after "Introduction" in the Introduction header above to make this work.
 
 This is a figure @fig-01-example.
 

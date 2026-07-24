@@ -1,0 +1,13 @@
+{
+  // Quarto Wingman / Zotero for Quarto defaults to writing citations to a
+  // references.bib at the workspace root - wrong for this project, since
+  // the actual Quarto project root for bibliography purposes is
+  // manuscript/ (a self-contained nested Quarto project, see CLAUDE.md's
+  // "Core architectural decision"). Pointing it here directly means new
+  // contributors get this right automatically, instead of needing to
+  // change this setting by hand per Positron/VS Code profile. See
+  // CLAUDE.md's "Citations" note - confirmed by direct testing that
+  // typst hard-errors if bibliography ever points outside manuscript/'s
+  // own project root (its sandbox refuses to read anything above it).
+  "zoteroForQuarto.bibFile": "manuscript/references.bib"
+}

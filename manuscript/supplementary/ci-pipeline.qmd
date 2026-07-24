@@ -155,13 +155,15 @@ scoping those permissions to a dedicated job keeps the main `render` job
 (which checks out a PR's arbitrary code) from ever holding write access to
 the live site.
 
-**Not independently confirmed in this session:** the `render` job's
-`upload-pages-artifact` step and the `deploy` job's `deploy-pages` step
-haven't been observed running in actual CI yet - only that the YAML is
-syntactically valid and the logic (main-only, needs: render) matches the
-documented pattern for this deploy method. Push and check the Pages
-deployment (Settings → Pages, or the environment's deployment history)
-before assuming the live site is actually up to date.
+**Confirmed working, with one real bug found and fixed:** the `deploy` job
+did run successfully and the site went live at
+`https://sawelch-niva.github.io/quarto-ms-template/` - but visiting that
+URL redirected to `supplementary/tables-mre.html` instead of the
+manuscript. Not a deploy-job bug: fetching the live `index.html` directly
+showed Quarto's own auto-generated redirect stub had picked a different
+target than the local build's version of the same file. See CLAUDE.md's
+"GitHub Pages: the auto-generated index redirect isn't deterministic" for
+the full finding and the fix (an explicit `manuscript/index.qmd`).
 
 # A real CI failure
 

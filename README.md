@@ -239,6 +239,18 @@ citation style is set via `csl: styles/apa.csl` in `manuscript/_quarto.yml`
 — swap in your target journal's `.csl` from the [Zotero Style
 Repository](https://www.zotero.org/styles).
 
+**If you use Quarto Wingman / Zotero for Quarto:** it defaults to writing
+citations to a `references.bib` at the workspace root, not
+`manuscript/references.bib` — wrong for this project, since `manuscript/`
+is its own nested Quarto project (see CLAUDE.md's "Core architectural
+decision") and typst hard-errors if the bibliography path ever points
+outside that project's own root. `.vscode/settings.json` pins
+`zoteroForQuarto.bibFile` to `manuscript/references.bib` so this is
+correct automatically for anyone opening the project in Positron/VS
+Code — no per-person setting to remember. See CLAUDE.md's "Directory
+layout" for the confirmed error this fixes (`error: failed to load file
+(access denied) ... cannot read file outside of project root`).
+
 # Recommended Addons
 
 ## Posit Extensions
