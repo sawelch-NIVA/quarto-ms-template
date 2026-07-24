@@ -38,38 +38,35 @@ jobs:
         with:
           use-public-rspm: true
 
-      # No DESCRIPTION file (this isn't an R package), so packages are
-      # listed explicitly - keep this list in sync with runme.R's
-      # required_pkgs. setup-r-dependencies also installs the Ubuntu
-      # system libraries these packages need (libcurl, libmagick++, Cairo,
-      # ...) via pak's sysreqs database, which plain install.packages()
-      # does not.
+      # No DESCRIPTION file (this isn't an R package) - the package list
+      # lives in R/required_packages.R instead, also sourced by runme.R,
+      # so there's exactly one place to add a package for a new notebook
+      # rather than two hand-synced copies (a real gap found in practice:
+      # a new notebook's dependency was added to runme.R's local install
+      # but not here, and CI failed on a `library()` call runme.R never
+      # would have caught either, since two of its three new packages
+      # happened to already be installed on the machine that ran it).
+      # Only base R is needed to read the list, so this runs before any
+      # package - including this project's own - is installed.
+      - name: Read required R packages
+        id: required-packages
+        run: |
+          {
+            echo 'list<<PKGLIST_EOF'
+            Rscript -e 'source("R/required_packages.R"); cat(required_pkgs, sep="\n")'
+            echo 'PKGLIST_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      # setup-r-dependencies, not runme.R's plain install.packages() -
+      # this also resolves and installs the Ubuntu system libraries these
+      # packages need (libcurl, libmagick++, Cairo, ...) via pak's sysreqs
+      # database and pulls pre-built RSPM binaries. install.packages()
+      # does neither, so pointing CI at runme.R directly would trade
+      # "missing R package" for "fails to compile from source because the
+      # system lib isn't there" - a worse failure mode, not a fix.
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          packages: |
-            targets
-            tarchetypes
-            quarto
-            tibble
-            here
-            jsonlite
-            kableExtra
-            gt
-            flextable
-            huxtable
-            DT
-            ggplot2
-            magick
-            svglite
-            ggtext
-            patchwork
-            systemfonts
-            ragg
-            showtext
-            sysfonts
-            extrafont
-            testthat
-            withr
+          packages: ${{ steps.required-packages.outputs.list }}
 
       - uses: quarto-dev/quarto-actions/setup@v2
 

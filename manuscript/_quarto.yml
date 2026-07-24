@@ -85,9 +85,10 @@ website:
               text: "Testing R/functions.R"
               icon: journal-code
         - section: "Appendices" # Static files
-        - href: https://github.com/sawelch-NIVA/quarto-ms-template
-          text: "Github Repo"
-          icon: github
+    tools:
+      - href: https://github.com/sawelch-NIVA/quarto-ms-template
+        text: "Github Repo"
+        icon: github
 
 format: 
   html:

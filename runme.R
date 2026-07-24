@@ -8,43 +8,12 @@
 # YAML/content, so don't.
 
 # 1. Check required packages ----
-required_pkgs <- c(
-  "targets",     # pipeline
-  "tarchetypes", # tar_quarto() and friends
-  "quarto",      # render + project helpers
-  "tibble",      # used by the example target — swap/extend as needed
-  "here",        # anchors file paths to the project root everywhere
-  "jsonlite",    # used by detect_render_format() (R/functions.R)
-  # Used by supplementary/tables-mre.qmd - drop if you delete that notebook.
-  "kableExtra",
-  "gt",
-  "flextable",
-  "huxtable",
-  "DT",
-  # Used by supplementary/images-mre.qmd and generate-images.R - drop if
-  # you delete that notebook. Mermaid needs no extra R package (Quarto
-  # handles it), but docx SVG embedding also needs a system `rsvg-convert`
-  # (librsvg) on PATH - see the notebook for details.
-  "ggplot2",
-  "magick",
-  "svglite",
-  # Used by supplementary/plots-mre.qmd - drop if you delete that notebook.
-  "ggtext",
-  "patchwork",
-  # Used by supplementary/fonts-mre.qmd and generate-fonts.R - drop if you
-  # delete that notebook. systemfonts/ragg is the recommended combo;
-  # showtext/sysfonts and extrafont are also loaded there for direct
-  # comparison (extrafont specifically to demonstrate why it's a poor fit
-  # here - see the notebook).
-  "systemfonts",
-  "ragg",
-  "showtext",
-  "sysfonts",
-  "extrafont",
-  # Used by tests/testthat/ - see manuscript/supplementary/testing-mre.qmd.
-  "testthat",
-  "withr"
-)
+# The list itself lives in R/required_packages.R, not here - it's also
+# read (dynamically, at runtime) by .github/workflows/render.yml, so
+# there's exactly one place to add a package for a new notebook rather
+# than two hand-synced copies. See that file's own header comment for why
+# CI doesn't just call this same install.packages() step directly.
+source("R/required_packages.R")
 
 missing_pkgs <- required_pkgs[
   !vapply(required_pkgs, requireNamespace, logical(1), quietly = TRUE)
@@ -81,9 +50,15 @@ if (length(missing_pkgs) > 0) {
 #                       doesn't recognize as its own.
 required_dirs <- c(
   "R",
-  "manuscript", "manuscript/tables", "manuscript/figures",
-  "manuscript/supplementary", "manuscript/styles",
-  "data-raw", "data", "manuscript/output", "submission"
+  "manuscript",
+  "manuscript/tables",
+  "manuscript/figures",
+  "manuscript/supplementary",
+  "manuscript/styles",
+  "data-raw",
+  "data",
+  "manuscript/output",
+  "submission"
 )
 
 for (d in required_dirs) {
