@@ -107,6 +107,16 @@ list(
     name = render_manuscript,
     path = "manuscript",
     execute = TRUE, # keep this unless you know you've just changed text, not code,
-    quiet = TRUE # set to true to get better logs if anything fails
+    # Deliberately FALSE, not a debugging leftover: a real CI failure with
+    # quiet = TRUE only ever surfaces "Rerun with quiet = FALSE to see the
+    # full error message" - advice that's useless in a non-interactive
+    # Actions job, since there's no way to rerun with a different flag
+    # without editing code and pushing again anyway. quiet = FALSE trades
+    # louder logs on every successful run for an actually-actionable error
+    # the one time it isn't. Confirmed unrelated to quiet_quarto_scan()
+    # above - that suppresses the dependency-scan noise regardless of this
+    # setting; this controls the real `quarto render` subprocess's own
+    # verbosity.
+    quiet = FALSE
   ))
 )
