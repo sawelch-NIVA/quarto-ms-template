@@ -66,6 +66,9 @@ website:
             - href: supplementary\images-mre.qmd
               text: "Rendering Images in Quarto"
               icon: journal-code
+            - href: supplementary\diagrams-mre.qmd
+              text: "Diagrams: Graphviz, cetz, ggraph"
+              icon: journal-code
             - href: supplementary\tables-mre.qmd
               text: "Rendering Tables in Quarto"
               icon: journal-code
@@ -82,6 +85,9 @@ website:
               text: "Testing R/functions.R"
               icon: journal-code
         - section: "Appendices" # Static files
+        - href: https://github.com/sawelch-NIVA/quarto-ms-template
+          text: "Github Repo"
+          icon: github
 
 format: 
   html:

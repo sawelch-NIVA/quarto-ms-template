@@ -1,0 +1,237 @@
+---
+# Render via `targets::tar_make()` (the `render_manuscript` target in
+# _targets.R), not `quarto render` directly - see manuscript.qmd.
+#
+# Minimal reproducible example (MRE) for diagram-drawing tools in Quarto,
+# beyond the mermaid coverage already in images-mre.qmd: Graphviz/DOT (the
+# knitr `dot` engine and DiagrammeR::grViz), cetz (typst-native drawing,
+# reached via a raw `{=typst}` block), and grammar-of-graphics network
+# diagrams in R (ggraph). Render all three formats and open them next to
+# each other.
+#
+# To surface this notebook in the site navigation, see the comment in
+# supplementary/notebook-template.qmd.
+title: "Diagrams in Quarto: Graphviz, cetz, and ggraph"
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(ggplot2)
+library(ggraph)
+library(tidygraph)
+library(DiagrammeR)
+library(here)
+here::i_am("manuscript/supplementary/diagrams-mre.qmd")
+source(here::here("R/functions.R"))
+fmt <- detect_render_format()
+
+set.seed(1)
+```
+
+{{< include _back-to-manuscript.qmd >}}
+
+::: {.callout-tip}
+# The Short Version
+- **Mermaid** already covers the "zero-install flowchart" case — see
+  [images-mre.qmd](images-mre.qmd), not repeated here.
+- **Graphviz's `dot` engine** shells out to a system `dot` binary — and it
+  actually worked here, but only found via whatever environment the real
+  `tar_quarto()` render process resolves, not the shell used to sanity-check
+  it beforehand. See the callout below — this is a live instance of the
+  "don't trust a shell's PATH without checking the process that matters"
+  finding already in CLAUDE.md's Pipeline gotchas.
+- **`DiagrammeR::grViz()`** draws the same DOT language via a bundled JS
+  library instead (no system binary needed) — but that makes it an
+  HTML/JS widget, same category as `DT`/`visNetwork` in
+  [tables-mre.qmd](tables-mre.qmd): fine in html, not something
+  docx/typst can render directly.
+- **cetz** rendered correctly here, canvas and all — contradicting an
+  open upstream report that canvas-wrapped diagrams fail. See the
+  callout below for exact versions and what that means (and doesn't
+  mean) for trusting it.
+- **ggraph** (tidygraph + ggplot2) produces an ordinary ggplot object, so
+  it inherits this project's existing ggplot findings
+  ([images-mre.qmd](images-mre.qmd), [plots-mre.qmd](plots-mre.qmd))
+  rather than being a new format-support question.
+:::
+
+# Why this notebook exists
+
+Flowcharts and network diagrams show up constantly in manuscripts, and
+"just use Mermaid" (see [images-mre.qmd](images-mre.qmd)) doesn't cover
+every case — hand-drawn technical diagrams (Graphviz/DOT), typst-native
+vector drawing (cetz), and actual data-driven network graphs (ggraph) are
+different tools for different jobs. Findings below are from direct
+testing in this template against `--to html`, `--to docx`, and
+`--to typst`, not assumed from each tool's own documentation.
+
+# Graphviz / DOT
+
+## The knitr `dot` engine
+
+Quarto/knitr can execute a ```` ```{dot} ```` chunk directly, but unlike
+Mermaid this shells out to a **system** `dot` executable rather than
+bundling anything — Graphviz has to be separately installed and
+resolvable on `PATH` at chunk-execution time.
+
+```{dot}
+//| label: fig-dot-engine
+//| fig-cap: "A DOT graph via the knitr dot engine"
+//| error: true
+digraph {
+  rankdir = LR
+  A [label = "Raw data"]
+  B [label = "Processing"]
+  C [label = "Manuscript"]
+  A -> B -> C
+}
+```
+
+`error: true` kept above as a defensive habit (same reasoning as gating
+any other format-specific failure in this template) even though it
+turned out not to be needed — see the callout below.
+
+::: {.callout-warning}
+## Found while testing: a clean `Sys.which("dot")` check doesn't mean what you'd think
+
+This chunk **rendered successfully** — real Graphviz-computed layout,
+confirmed by inspecting the actual SVG markup in `output/supplementary/diagrams-mre.html`
+(node ellipses, edge paths, `font-family="Times,serif"` — genuine `dot`
+output, not a fallback). That's despite `Sys.which("dot")` returning
+empty in a plain `Rscript -e 'Sys.which("dot")'` check run immediately
+before and after the same render, in what looks like the same shell
+environment.
+
+This is a live instance of a finding CLAUDE.md's "Pipeline gotchas"
+section already documents for a different symptom: a single `tar_make()`
+run involves multiple separately-resolved processes (the R driving
+`tar_make()`, the `quarto` CLI subprocess, and the R that `quarto` itself
+spawns to execute chunks), and none of them are guaranteed to see the
+same `PATH` as whatever shell you happen to be checking from. **The
+practical upshot is the same as before, just for a new symptom: don't
+trust a "not on PATH" finding from a diagnostic shell as proof a render
+will fail — check whether the actual render fails, not whether a
+side-channel check says it should.** Conversely: if a `{dot}` chunk *does*
+fail for you, `Sys.which("dot")` from your own terminal isn't a reliable
+way to rule out "it's actually there," or to confirm it's really missing
+— check the render's own error output.
+:::
+
+## `DiagrammeR::grViz()`
+
+Same DOT language, but rendered via `viz.js`, a JS Graphviz port bundled
+inside the `DiagrammeR` package — no system `dot` install required.
+
+```{r}
+#| label: fig-grviz
+#| fig-cap: "The same graph via DiagrammeR::grViz()"
+#| eval: !expr fmt$is_html
+grViz("
+digraph {
+  rankdir = LR
+  A [label = 'Raw data']
+  B [label = 'Processing']
+  C [label = 'Manuscript']
+  A -> B -> C
+}
+")
+```
+
+::: {.content-visible unless-format="html"}
+*`DiagrammeR::grViz()` output omitted here — it's an htmlwidget with no
+built-in static export, same limitation class as `DT`/`visNetwork` in
+[tables-mre.qmd](tables-mre.qmd). `DiagrammeR::export_svg()` plus a
+headless-browser screenshot step (`rsvg`/`webshot2`) can produce a static
+image for docx/typst, but that's a separate rendering pipeline, not
+something Quarto does automatically the way it does for Mermaid.*
+:::
+
+# cetz: typst-native vector drawing
+
+[cetz](https://github.com/cetz-package/cetz) is typst's most popular
+drawing package — the closest thing typst has to TikZ. Quarto has no
+built-in cetz support; the only way in is a raw `` {=typst} `` block that
+imports the package directly, which only typst output actually uses —
+pandoc drops raw `{=typst}` content silently for html/docx.
+
+```{=typst}
+#import "@preview/cetz:0.3.4"
+#cetz.canvas({
+  import cetz.draw: *
+  circle((0, 0), radius: 1)
+  line((0, 0), (2, 2))
+  content((2.3, 2), [Manuscript])
+})
+```
+
+::: {.content-visible unless-format="typst"}
+*Nothing renders above in html/docx — raw `{=typst}` content is typst-only
+by design. See the callout below for what happened in the typst render.*
+:::
+
+::: {.callout-note}
+## Found while testing: the reported canvas failure did NOT reproduce here
+
+There's an open upstream report
+([quarto-dev/quarto-cli#12439](https://github.com/quarto-dev/quarto-cli/discussions/12439))
+that any diagram wrapping a `cetz.canvas` fails to render through Quarto,
+attributed to how Quarto assembles the typst preamble. The block above
+uses `cetz.canvas` deliberately, to test that exact failure mode rather
+than a simplified case that dodges it — **it rendered correctly**:
+`quarto call typst-gather`-style `@preview` fetch pulled `cetz:0.3.4` and
+its `oxifmt:0.2.1` dependency automatically at render time, and the
+circle/line/"Manuscript" label all show up in the compiled PDF — confirmed
+by `pdftotext`-extracting `output/supplementary/diagrams-mre.pdf` and
+finding the literal "Manuscript" text label from the `content(...)` call,
+not just a successful exit code.
+
+Tested with Quarto 1.10.18. Don't read this as "the report was wrong" —
+open discussions like that one are often narrower than their title
+(a specific extension/preamble combination, an older Quarto/typst
+version, a more complex canvas) and this environment may simply not hit
+whatever specific trigger they found. Treat cetz as **worth trying, not
+assumed-broken** — but given it needs a live fetch from the `@preview`
+package registry the first time (no vendoring here, unlike the
+`typst-gather` option for custom Quarto formats — see
+[Custom Typst Formats](https://quarto.org/docs/output-formats/typst-custom.html)),
+also don't assume it'll work offline or in a network-restricted CI
+runner without that extra step.
+:::
+
+# Grammar-of-graphics network diagrams: ggraph
+
+`ggraph` (built on `tidygraph`) draws graphs the same way `ggplot2` draws
+everything else — layers, aesthetics, a `+`-composed spec — rather than a
+separate DSL like DOT or Mermaid. Because the output is an ordinary
+`ggplot` object, it should inherit this project's existing ggplot
+findings (device, fonts, sizing — see
+[images-mre.qmd](images-mre.qmd)/[plots-mre.qmd](plots-mre.qmd)) rather
+than raising new format-support questions of its own.
+
+```{r}
+#| label: fig-ggraph
+#| fig-cap: "A small directed graph via ggraph"
+g <- tidygraph::tbl_graph(
+  nodes = data.frame(name = c("Raw data", "Processing", "Manuscript")),
+  edges = data.frame(from = c(1, 2), to = c(2, 3))
+)
+
+ggraph(g, layout = "linear") +
+  geom_edge_link(
+    arrow = arrow(length = unit(3, "mm")),
+    end_cap = circle(4, "mm")
+  ) +
+  geom_node_point(size = 6, colour = "steelblue") +
+  geom_node_text(aes(label = name), vjust = -1.5) +
+  theme_graph()
+```
+
+- ✅ Renders like any other ggplot figure — same device (`ragg_png`),
+  same `fig-width`/`fig-height`/`fig-dpi` defaults, no format-specific
+  handling needed.
+- The right tool when a diagram's layout should be *computed from data*
+  (an actual graph/network structure) rather than hand-positioned, which
+  is what Mermaid/DOT/cetz all require.
+
+# References

@@ -29,7 +29,9 @@ I plan to use it as a combination template and testbed for my favourite R and ot
 Write your introduction here, citing sources as needed [@example2024]. I personally prefer to use [Quarto Wingman](https://github.com/ntluong95/quarto-wingman)'s citation functionality, which hooks into the existing Zotero API and is very fast. Here are some more citations: [@hetheringtonTwoThreeFourAtom1975; @hartiganDipTestUnimodality1985; @tongEyesWideShut2024]:
 
 `@example2024` - appears as @example2024
+
 `[@example2024]` - appears as [@example2024]
+<!-- TODO: Make this a table -->
 `[@example2024; @hetheringtonTwoThreeFourAtom1975]` - appears as [@example2024; @hetheringtonTwoThreeFourAtom1975]
 
 Note that depending on how you're handling your citation keys in Zotero, they may turn up as `nameYear` or `nameTitleTitleTitleYear` or whatever custom choice you set your BibTex keys to. 

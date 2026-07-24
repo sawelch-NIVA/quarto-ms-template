@@ -393,6 +393,42 @@ Full writeup lives in the notebook; headline findings:
   `knitr: opts_chunk: dev: "ragg_png"` — confirmed this also silences the
   original warning in `plots-mre.qmd` itself.
 
+### Diagrams (`manuscript/supplementary/diagrams-mre.qmd`)
+Full writeup lives in the notebook; headline findings:
+
+- **Mermaid already covers the zero-install case** — see "Images &
+  diagrams" above, not repeated here. This notebook covers Graphviz/DOT,
+  cetz, and grammar-of-graphics network diagrams (`ggraph`) instead.
+- **The knitr `dot` engine worked in this environment**, despite
+  `Sys.which("dot")` returning empty from a plain diagnostic
+  `Rscript -e 'Sys.which("dot")'` check run immediately before and after
+  the same render — a second, independently-confirmed instance of the
+  "three separately-resolved processes don't share one PATH" finding
+  under "Pipeline gotchas" below, this time for a knitr chunk engine
+  rather than `Rscript.exe` resolution. **Don't trust a "not on PATH"
+  result from a diagnostic shell as proof a `{dot}` chunk will fail** —
+  check whether the actual render fails.
+- **`DiagrammeR::grViz()` is an htmlwidget, same limitation class as
+  `DT`/`visNetwork`** (see "R table packages" above) — fine in html, no
+  built-in static export for docx/typst. Gate with
+  `eval: !expr is_html` same as those.
+- **cetz (typst's native drawing package, reached via a raw
+  `` {=typst} `` block) rendered correctly here, canvas and all** —
+  tested with Quarto 1.10.18. This contradicts an open upstream report
+  ([quarto-dev/quarto-cli#12439](https://github.com/quarto-dev/quarto-cli/discussions/12439))
+  that canvas-wrapped cetz diagrams fail to render through Quarto. Not
+  evidence the report is wrong — likely a narrower trigger (a specific
+  Quarto/typst version or custom-format preamble combination) that this
+  simple in-document case doesn't hit. Treat cetz as **worth trying, not
+  assumed-broken**, but note it fetches its `@preview` package from the
+  network the first time (no vendoring here) — don't assume it works
+  offline or on a network-restricted CI runner without the
+  `quarto call typst-gather` step
+  ([Custom Typst Formats](https://quarto.org/docs/output-formats/typst-custom.html)).
+- **`ggraph` (tidygraph + ggplot2) is an ordinary `ggplot` object** — it
+  inherits every ggplot finding already documented above (device, fonts,
+  sizing) rather than raising new format-support questions of its own.
+
 ### Pipeline gotchas
 - `tar_source()` sources every `.R` file directly under `R/` on every
   pipeline load (`tar_make()`, `tar_visnetwork()`, even `tar_manifest()`).
