@@ -55,19 +55,21 @@ website:
           contents:
             - href: manuscript.qmd
               text: "Main File"
-        - section: "Notebooks" # Notebooks with programmatic logic
+        - section: "Templates" # Blank starting points to copy
           contents:
             - href: supplementary\notebook-template.qmd
               text: "Notebook Template"
               icon: journal-code
-            - href: supplementary\rendering-pipeline.qmd
-              text: "How Rendering Works: knitr, Pandoc, Typst"
-              icon: journal-code
+        - section: "Aesthetics" # Visual output: figures, tables, colour, fonts
+          contents:
             - href: supplementary\images-mre.qmd
               text: "Rendering Images in Quarto"
               icon: journal-code
             - href: supplementary\diagrams-mre.qmd
               text: "Diagrams: Graphviz, cetz, ggraph"
+              icon: journal-code
+            - href: supplementary\colour-mre.qmd
+              text: "Colour: palettes, colorspace, semantics"
               icon: journal-code
             - href: supplementary\tables-mre.qmd
               text: "Rendering Tables in Quarto"
@@ -78,13 +80,22 @@ website:
             - href: supplementary\fonts-mre.qmd
               text: "Fonts in ggplot2"
               icon: journal-code
+        - section: "Infrastructure" # Build/render/test mechanics, not visual output
+          contents:
+            - href: supplementary\rendering-pipeline.qmd
+              text: "How Rendering Works: knitr, Pandoc, Typst"
+              icon: journal-code
             - href: supplementary\ci-pipeline.qmd
               text: "Continuous Integration"
               icon: journal-code
             - href: supplementary\testing-mre.qmd
               text: "Testing R/functions.R"
               icon: journal-code
-        - section: "Appendices" # Static files
+        - section: "Appendices" # Static files, no R execution
+          contents:
+            - href: appendices\appendix-a-example.qmd
+              text: "Appendix A: Example"
+              icon: file-text
     tools:
       - href: https://github.com/sawelch-NIVA/quarto-ms-template
         text: "Github Repo"
@@ -102,10 +113,10 @@ format:
     number-sections: true
     lightbox: true  # enable click-to-zoom images
     # default HTML dimensions are a bit narrow (note that styles.css will override these)
-    grid:
-      sidebar-width: 250px
-      body-width: 700px
-      margin-width: 300px
+    # grid:
+    #   sidebar-width: 250px
+    #   body-width: 700px
+    #   margin-width: 300px
     citeproc: true # needed?
 
 

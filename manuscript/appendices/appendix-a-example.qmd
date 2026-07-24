@@ -1,0 +1,22 @@
+---
+# Render via `targets::tar_make()` (the `render_manuscript` target in
+# _targets.R), not `quarto render` directly - see manuscript.qmd.
+#
+# Example appendix - static, journal-supplement-style content (no R
+# execution), as distinct from supplementary/*.qmd's "notebooks with
+# programmatic logic" (see _quarto.yml's Notebooks-vs-Appendices sidebar
+# split). Copy this file for a real appendix; delete it otherwise.
+#
+# To surface a new appendix in the site navigation, add it under the
+# "Appendices" section's `contents:` in _quarto.yml, same pattern as the
+# entry already there for this file.
+title: "Appendix A: Example"
+---
+
+{{< include ../supplementary/_back-to-manuscript.qmd >}}
+
+This is a placeholder appendix — static content with no R code, for
+material that belongs with the manuscript (extended methods, a
+questionnaire, raw supporting text) but doesn't need `targets`/knitr to
+produce it. For a notebook that *does* run R code, start from
+[Notebook Template](../supplementary/notebook-template.qmd) instead.

@@ -44,6 +44,12 @@ required_pkgs <- c(
   "showtext",
   "sysfonts",
   "extrafont",
+  # Also used by supplementary/fonts-mre.qmd - its Emoji section
+  # specifically. emojifont is used once, deliberately, to demonstrate a
+  # real failure (its emoji-name registry doesn't match the `emoji`
+  # package's) - not a working example.
+  "emoji",
+  "emojifont",
   # Used by supplementary/diagrams-mre.qmd - drop if you delete that
   # notebook. cetz (typst-native drawing) needs no R package - it's a raw
   # `{=typst}` block. The knitr `dot` engine needs a system Graphviz `dot`
@@ -52,6 +58,11 @@ required_pkgs <- c(
   "ggraph",
   "tidygraph",
   "DiagrammeR",
+  # Used by supplementary/colour-mre.qmd - drop if you delete that
+  # notebook. RColorBrewer/viridis/colorspace/scales are already pulled in
+  # by other notebooks above; scico and MetBrewer are new here.
+  "scico",
+  "MetBrewer",
   # Used by tests/testthat/ - see manuscript/supplementary/testing-mre.qmd.
   "testthat",
   "withr"

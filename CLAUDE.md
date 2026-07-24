@@ -83,6 +83,11 @@ manuscript/      a SELF-CONTAINED Quarto project, one level below the repo root 
                    static fixture images for supplementary/images-mre.qmd
                    (tracked in git)
   supplementary/   extra notebooks (rendered automatically, not auto-linked in nav)
+  appendices/      static appendix content, no R execution - as distinct from
+                   supplementary/'s "notebooks with programmatic logic" (see
+                   _quarto.yml's sidebar: Notebooks vs Appendices are separate
+                   sections). Same "rendered automatically, not auto-linked"
+                   rule as supplementary/.
   styles/          CSL file + Word reference docs (db-space-line-n.docx, standard.docx)
   references.bib   bibliography
   output/          rendered output, all formats (git-ignored, rebuilt by
@@ -429,6 +434,51 @@ Full writeup lives in the notebook; headline findings:
   inherits every ggplot finding already documented above (device, fonts,
   sizing) rather than raising new format-support questions of its own.
 
+### Colour palettes (`manuscript/supplementary/colour-mre.qmd`)
+Full writeup lives in the notebook; headline findings:
+
+- **ggplot2's own defaults were the weakest option in every scale type
+  tested** — a muddy low-contrast continuous gradient, and a diverging
+  scale built from literal `"red"`/`"blue"` with a non-neutral midpoint
+  (RGB-space interpolation through literal `"white"` isn't perceptually
+  neutral).
+- **Once a diverging palette avoids two specific mistakes — saturated
+  named-colour endpoints, a non-neutral midpoint — RColorBrewer's
+  `fermenter`, a hand-specified `scale_fill_steps2()`, and colorspace's
+  `diverging_hcl` converge on nearly the same result.** The specific
+  package matters less than getting that structure right.
+- **viridis pushed dark (`mako`, `direction = -1`) got dark enough to
+  threaten gridline/label legibility** in a filled tile — "viridis is
+  safe" doesn't mean every direction/range choice within it is free of
+  the same "check the actual rendered output" discipline as anything
+  else.
+- **scico, not viridis, is the more field-relevant default for
+  earth/ocean/water-science figures specifically** — same
+  perceptually-uniform design lineage (Fabio Crameri's scientific colour
+  maps), and closer to what reviewers in that field expect to see.
+- **`colorspace::lighten()`/`darken()` derive a coherent palette family
+  from one base hue per group** (any base palette works — it operates on
+  hex colours directly, not a palette object) — confirmed with a
+  from-scratch reproduction of the pattern that prompted this notebook
+  (one base hue per top-level group, lightened across a second
+  variable).
+- **A hand-picked "thematic" palette (water=blue, ground=brown, air=pale)
+  separated *worse* under CVD simulation
+  (`colorspace::deutan()`/`protan()`/`tritan()`) than an
+  algorithmically-spaced `qualitative_hcl` palette with no thematic
+  intent at all** — confirmed by simulating both, not assumed. Eyeballed
+  "photographically plausible" hues tend to cluster in similar
+  lightness/chroma, which is exactly the dimension CVD collapses
+  hardest. Not an argument against thematic colour — anchor hue
+  thematically, then explicitly force the lightness/chroma spacing
+  (e.g. run the thematic hues through `qualitative_hcl`-matched `l`/`c`
+  values) rather than trusting eyeballed hex codes, and re-run the CVD
+  check on the result.
+- **New dependencies**: `scico` and `MetBrewer` weren't previously used
+  anywhere in this template — both added to `R/required_packages.R`
+  (the single source of truth introduced after the `ggraph`/CI incident
+  — see "Pipeline gotchas" below) rather than repeating that gap.
+
 ### Pipeline gotchas
 - `tar_source()` sources every `.R` file directly under `R/` on every
   pipeline load (`tar_make()`, `tar_visnetwork()`, even `tar_manifest()`).
@@ -437,6 +487,29 @@ Full writeup lives in the notebook; headline findings:
   the pipeline. Keep `runme.R` at the project root, never in `R/` — same
   reasoning applies to `generate-images.R` (a one-off script with file
   I/O side effects, not a function library).
+- **No DESCRIPTION file** (this isn't an R package), so the required-package
+  list has nowhere canonical to live except a plain R script:
+  `R/required_packages.R` (a bare `required_pkgs <- c(...)` vector, no
+  side effects — safe to `source()` before any package, including this
+  project's own, is installed). `runme.R` sources it directly for local
+  bootstrap; `.github/workflows/render.yml` reads it at runtime (an
+  `Rscript` step piping into `$GITHUB_OUTPUT`) and feeds the result to
+  `r-lib/actions/setup-r-dependencies`, rather than hardcoding a second
+  copy of the list in YAML. **Introduced after a real incident**: a new
+  notebook (`diagrams-mre.qmd`) added `ggraph` to a hand-typed local list
+  but not the CI one, and CI failed on a bare `library(ggraph)` call
+  that local testing never caught — worse, two of that notebook's three
+  new packages (`tidygraph`, `DiagrammeR`) were missing from *both*
+  lists and nobody noticed locally, because `requireNamespace()`-gated
+  installs can't flag a gap for a package that already happens to be on
+  the machine for unrelated reasons. **Don't add a second hardcoded
+  package list anywhere** — CI intentionally does NOT just call
+  `runme.R`'s `install.packages()` directly, either: `setup-r-dependencies`
+  also resolves and installs the Ubuntu system libraries these packages
+  need (libcurl, libmagick++, Cairo, ...) via `pak`'s sysreqs database
+  and pulls prebuilt RSPM binaries, which plain `install.packages()`
+  does neither of — pointing CI at `runme.R` would trade "missing R
+  package" for "fails to compile from source," a worse failure mode.
 - `tarchetypes::tar_quarto()`'s dependency-scanning pass evaluates chunk
   options like `eval: !expr is_html` without running the setup chunk
   first, printing a harmless `Error in eval(x, envir = envir) : object

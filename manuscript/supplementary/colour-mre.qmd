@@ -1,0 +1,494 @@
+---
+# Render via `targets::tar_make()` (the `render_manuscript` target in
+# _targets.R), not `quarto render` directly - see manuscript.qmd.
+#
+# A comparison of R's most-used colour palette packages for scientific
+# figures - ggplot2 defaults, RColorBrewer, viridis, scico, MetBrewer, and
+# colorspace - across the three ggplot scale mechanisms (continuous `_c`,
+# discrete `_d`, binned `_b`), plus colorspace's lighten()/darken() for
+# deriving coherent palette families, and a worked example of the tension
+# between thematically "obvious" colours and colours that actually survive
+# colour-vision deficiency (CVD). Uses a synthetic-but-structured
+# water-quality dataset, not `diamonds`.
+#
+# To surface this notebook in the site navigation, see the comment in
+# supplementary/notebook-template.qmd.
+title: "Colour in ggplot2: palettes, colorspace, and semantics"
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(patchwork)
+library(RColorBrewer)
+library(viridis)
+library(scico)
+library(colorspace)
+library(MetBrewer)
+library(here)
+here::i_am("manuscript/supplementary/colour-mre.qmd")
+
+set.seed(42)
+```
+
+{{< include _back-to-manuscript.qmd >}}
+
+::: {.callout-tip}
+# The Short Version
+- **ggplot2's defaults are the weakest option shown here** in every scale
+  type tested — muddy low-contrast continuous gradients, and a diverging
+  scale built from literal `"red"`/`"blue"` that's too saturated and not
+  neutral at its midpoint.
+- **viridis is a genuinely safe default** — but "safe" isn't
+  "unconditionally good": reversed and pushed dark (`mako`, `direction =
+  -1`) it got dark enough to threaten legibility of gridlines/labels in a
+  filled tile. Direction and range still need checking, even with
+  viridis.
+- **scico is the closest thing to a viridis for earth/ocean/water
+  science** specifically — same perceptually-uniform design lineage, and
+  its palettes (`davos`, `vik`, `broc`, ...) are the field-standard choice
+  in a lot of geoscience journals. Probably the single most relevant
+  recommendation here for this project's actual domain.
+- **Once a diverging palette avoids the two real sins** (saturated named
+  colours as endpoints, a non-neutral midpoint), **RColorBrewer,
+  `scale_*_steps2()`, and colorspace's `diverging_hcl` converge on nearly
+  the same result** — the specific package matters less than getting
+  that structure right.
+- **`colorspace::lighten()`/`darken()` can derive a whole coherent
+  palette family from one base hue per group** — the pattern from the
+  script that prompted this notebook, reproduced below.
+- **The intuitive thing — "water is blue" — was tested against a
+  statistically-spaced palette under CVD simulation, and lost.**
+  Eyeballed "realistic" hues (water-blue, earth-brown, air-grey) tend to
+  cluster in similar lightness/chroma, which is exactly what a
+  colour-vision-deficient reader can't distinguish. See the callout in
+  that section for what to do instead of abandoning theme entirely.
+:::
+
+# Why this notebook exists
+
+Colour is usually the last thing decided and the first thing that goes
+wrong. ggplot2's defaults are functional, not good; the packages that fix
+that (RColorBrewer, viridis, scico, MetBrewer, colorspace) each solve a
+different part of the problem, and none of them is a single drop-in
+answer for every scale type. This notebook works through R's three
+`ggplot2` colour-scale mechanisms — continuous (`scale_*_c`), discrete
+(`scale_*_d`), and binned (`scale_*_b`) — comparing the same handful of
+packages on each, then covers two specific techniques worth having on
+hand: deriving a palette family from a base hue with `colorspace`, and
+checking whether a thematically-motivated palette actually survives
+colour-vision deficiency.
+
+Findings below are from actually rendering the figures and looking at
+them (including a CVD simulation, not just an assumption about what
+"probably" survives it) — not received wisdom about which package is
+best.
+
+# The data
+
+A synthetic (not `diamonds`) water-monitoring dataset, structured to make
+categorical, continuous, and diverging demos all meaningful at once:
+eight analytes (PFAS compounds, metals, nutrients, microplastics) sampled
+across four sample matrices and four region types, with a made-up but
+plausible regulatory guideline per analyte so `pct_exceedance` is a real
+diverging quantity (positive = over guideline) rather than an arbitrary
+centred variable.
+
+```{r}
+#| label: build-data
+matrices <- c("Freshwater", "Seawater", "Groundwater", "Air/Deposition")
+regions <- c("Coastal", "Upland", "Urban", "Agricultural")
+analytes <- c(
+  "PFOA", "PFOS", "Nitrate", "Lead", "Microplastics",
+  "Chloride", "Phosphate", "Cadmium"
+)
+# Made-up but plausible guideline values (ug/L)
+guidelines <- c(
+  PFOA = 0.004, PFOS = 0.004, Nitrate = 50, Lead = 5,
+  Microplastics = 1, Chloride = 250, Phosphate = 0.1, Cadmium = 3
+)
+# Matrix/region multipliers give the data real (if fabricated) structure
+# instead of pure noise - urban/agricultural runoff runs higher, air
+# deposition lowest, etc.
+matrix_mult <- c(
+  "Freshwater" = 1, "Seawater" = 0.4, "Groundwater" = 0.6,
+  "Air/Deposition" = 0.15
+)
+region_mult <- c(Coastal = 0.8, Upland = 0.5, Urban = 1.8, Agricultural = 1.3)
+
+water_quality <- tibble(
+  site_id = sample(sprintf("S%03d", 1:60), 1200, replace = TRUE),
+  region = sample(regions, 1200, replace = TRUE, prob = c(.3, .2, .25, .25)),
+  matrix = sample(matrices, 1200, replace = TRUE, prob = c(.4, .25, .25, .1)),
+  analyte = sample(analytes, 1200, replace = TRUE),
+  date = as.Date("2023-01-01") + sample(0:730, 1200, replace = TRUE)
+) |>
+  mutate(
+    guideline = guidelines[analyte],
+    meanlog = log(guideline * matrix_mult[matrix] * region_mult[region]),
+    concentration = rlnorm(1200, meanlog = meanlog, sdlog = 0.7),
+    pct_exceedance = (concentration - guideline) / guideline * 100,
+    analyte = factor(analyte, levels = names(sort(guidelines))),
+    matrix = factor(matrix, levels = matrices)
+  )
+```
+
+# Discrete (`_d`) scales: categorical identity
+
+Concentration by analyte (log scale — these span four orders of
+magnitude, from PFAS in the ng/L range to chloride in mg/L). Colour here
+carries pure identity, not magnitude — the boxes could be any order and
+lose no information, so the job of the palette is purely "make eight
+things tell apart," including under colour-vision deficiency.
+
+```{r}
+#| label: fig-discrete-compare
+#| fig-cap: "Concentration by analyte, five categorical palette approaches"
+#| fig-width: 8
+#| fig-height: 9
+p_base <- ggplot(water_quality, aes(x = analyte, y = concentration, fill = analyte)) +
+  geom_boxplot(outlier.size = 0.5) +
+  scale_y_log10() +
+  theme_minimal(base_size = 10) +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 40, hjust = 1)) +
+  labs(x = NULL, y = "Concentration (ug/L, log scale)")
+
+p1 <- p_base + labs(title = "ggplot2 default hues")
+p2 <- p_base + scale_fill_brewer(palette = "Set2") + labs(title = "RColorBrewer 'Set2'")
+p3 <- p_base + scale_fill_viridis_d(option = "viridis") + labs(title = "viridis (discrete)")
+p4 <- p_base + scale_fill_manual(values = MetBrewer::met.brewer("Hokusai1", 8)) +
+  labs(title = "MetBrewer 'Hokusai1'")
+p5 <- p_base + scale_fill_manual(values = colorspace::qualitative_hcl(8, palette = "Dark 3")) +
+  labs(title = "colorspace qualitative_hcl 'Dark 3'")
+
+(p1 | p2) / (p3 | p4) / (p5 | plot_spacer())
+```
+
+- **ggplot2 defaults**: the evenly-spaced hue wheel is *not* perceptually
+  even — yellow-green and orange read as noticeably lower-contrast
+  against a white background than the blues/purples in the same set, at
+  identical lightness/chroma settings.
+- **RColorBrewer `Set2`**: a genuinely solid qualitative set, muted and
+  print-friendly, but hard-capped at 8 colours for this palette (`Set3`
+  goes to 12) — check `RColorBrewer::brewer.pal.info` before assuming a
+  Brewer qualitative palette covers your category count.
+- **viridis (discrete)**: designed for *ordered* magnitude, not identity
+  — using it for unordered categories works (it's colourblind-safe by
+  construction) but the implied light-to-dark ordering is meaningless
+  noise here. Fine in a pinch, not the first choice for pure identity.
+- **MetBrewer `Hokusai1`**: curated from an actual artwork's palette —
+  more visually distinctive/memorable than an algorithmically-spaced set,
+  at the cost of no guarantee about perceptual spacing. Worth the same
+  CVD check as anything else before relying on it (not done separately
+  here — the CVD-simulation method is demonstrated later in this
+  notebook on the `matrix` palette; apply it to whichever palette you
+  actually ship).
+- **colorspace `qualitative_hcl`**: algorithmically even lightness/chroma
+  by construction (that's the point of specifying colour in HCL space
+  rather than RGB/hue-wheel) — the "boring but correct" choice.
+
+# Continuous (`_c`) scales: sequential magnitude
+
+Mean % of guideline, by region and analyte — here colour *is* the data
+(a heatmap), so palette quality has a much bigger effect on readability
+than in the boxplots above.
+
+```{r}
+#| label: fig-continuous-compare
+#| fig-cap: "Region x analyte mean concentration, four sequential palettes"
+#| fig-width: 8.5
+#| fig-height: 6
+heat_data <- water_quality |>
+  group_by(region, analyte) |>
+  summarise(mean_pct_of_guideline = mean(concentration / guideline) * 100, .groups = "drop")
+
+p_heat_base <- ggplot(heat_data, aes(x = analyte, y = region, fill = mean_pct_of_guideline)) +
+  geom_tile(colour = "white", linewidth = 0.5) +
+  theme_minimal(base_size = 10) +
+  theme(axis.text.x = element_text(angle = 40, hjust = 1)) +
+  labs(x = NULL, y = NULL, fill = "% of\nguideline")
+
+h1 <- p_heat_base + scale_fill_gradient(low = "white", high = "#08306B") +
+  labs(title = "ggplot default gradient")
+h2 <- p_heat_base + scale_fill_distiller(palette = "Blues", direction = 1) +
+  labs(title = "RColorBrewer distiller 'Blues'")
+h3 <- p_heat_base + scale_fill_viridis_c(option = "mako", direction = -1) +
+  labs(title = "viridis 'mako' (reversed)")
+h4 <- p_heat_base + scale_fill_scico(palette = "davos", direction = -1) +
+  labs(title = "scico 'davos' (reversed)")
+
+(h1 | h2) / (h3 | h4)
+```
+
+- **ggplot default gradient** (`scale_fill_gradient()` with hand-picked
+  endpoints): flattest, muddiest low-contrast result of the four — the
+  Coastal and Agricultural rows are hard to tell apart. This is the
+  "arse" default the whole notebook exists to avoid.
+- **RColorBrewer `distiller`**: clean, but Brewer sequential palettes
+  interpolate a palette designed for ~9 discrete swatches, not
+  continuous data — fine here, worth checking for banding artefacts on
+  a smoother/larger dataset.
+- **viridis `mako`, reversed**: highest-contrast of the four, which is
+  exactly what surfaced a real caveat — pushed dark enough at the high
+  end that the white gridlines and this document's dark-on-light theme
+  both lose contrast against the Urban row. Reversing/extending a
+  viridis palette isn't free of the same "check the actual rendered
+  output" discipline as anything else here.
+- **scico `davos`**: same perceptually-uniform design lineage as
+  viridis (Fabio Crameri's scientific colour maps), and the closest
+  thing to a field-standard for earth/ocean/atmospheric science
+  specifically — worth defaulting to this, not viridis, for a
+  water-science figure, purely for the "this is what reviewers in my
+  field expect to see" reason as much as any perceptual one.
+
+# Binned + diverging scales: magnitude with a meaningful zero
+
+`pct_exceedance` (positive = over the regulatory guideline) is a genuine
+diverging quantity, and regulatory data is routinely read in bins
+("under guideline" / "1-2x" / ">2x") rather than as continuous shading —
+`scale_*_b`/`scale_*_binned`/`scale_*_fermenter` all bin a continuous
+variable into discrete-looking legend swatches while the underlying data
+stays continuous.
+
+```{r}
+#| label: fig-diverging-compare
+#| fig-cap: "Mean % over/under guideline, four binned diverging palettes"
+#| fig-width: 8.5
+#| fig-height: 6
+p_div_base <- ggplot(
+  heat_data |> mutate(pct_exceed = mean_pct_of_guideline - 100),
+  aes(x = analyte, y = region, fill = pct_exceed)
+) +
+  geom_tile(colour = "white", linewidth = 0.5) +
+  theme_minimal(base_size = 10) +
+  theme(axis.text.x = element_text(angle = 40, hjust = 1)) +
+  labs(x = NULL, y = NULL, fill = "% over/under\nguideline")
+
+d1 <- p_div_base + scale_fill_gradient2(low = "blue", mid = "white", high = "red") +
+  labs(title = "ggplot default diverging")
+d2 <- p_div_base + scale_fill_fermenter(palette = "RdBu", direction = -1) +
+  labs(title = "RColorBrewer fermenter 'RdBu' (binned)")
+d3 <- p_div_base + scale_fill_steps2(low = "#2166AC", mid = "grey95", high = "#B2182B", midpoint = 0) +
+  labs(title = "scale_fill_steps2 (binned, custom hex)")
+d4 <- p_div_base + colorspace::scale_fill_binned_diverging(palette = "Blue-Red 3") +
+  labs(title = "colorspace diverging_hcl (binned)")
+
+(d1 | d2) / (d3 | d4)
+```
+
+- **ggplot default** (`scale_fill_gradient2()` with literal `"blue"`/
+  `"red"`): too saturated, and RGB-space interpolation through literal
+  `"white"` doesn't stay perceptually neutral near the midpoint the way
+  a true grey does — small values near zero read with a faint colour
+  cast rather than genuinely blank.
+- **The other three converge on nearly the same result.** Once the two
+  real mistakes are fixed — don't use fully-saturated named RGB colours
+  as endpoints, do use a genuinely neutral grey (not literal white) at
+  the midpoint — RColorBrewer's `fermenter`, a hand-specified
+  `scale_fill_steps2()`, and colorspace's `diverging_hcl` all land in
+  the same visual place. **The specific package matters less than
+  getting that structure right**, which matches this skill's own
+  general colour rule: sequential is one hue light-to-dark, diverging is
+  two hues plus a neutral midpoint, never a hue *at* the midpoint.
+
+# Deriving coherent palette families with `colorspace::lighten()`
+
+Sometimes the right palette isn't any single package's preset — it's a
+small base palette (one hue per group that matters) *manipulated* to
+add a second dimension. This is the pattern from the script that
+prompted this notebook: pick one base colour per top-level group (there,
+LLM provider; here, sample matrix), then use `colorspace::lighten()` to
+fan each one out across a second variable (there, token limit; here,
+region) while staying visually part of the same family.
+
+```{r}
+#| label: fig-lighten-derived
+#| fig-cap: "One base hue per matrix (viridis), lightened by region (colorspace)"
+#| fig-width: 7
+#| fig-height: 5
+base_hue <- setNames(
+  viridis::viridis(4, option = "viridis", begin = 0.15, end = 0.75),
+  matrices
+)
+lighten_amt <- c(Coastal = 0, Upland = 0.25, Urban = 0.5, Agricultural = 0.7)
+
+derived <- expand.grid(matrix = matrices, region = names(lighten_amt)) |>
+  mutate(
+    fill_col = colorspace::lighten(base_hue[matrix], lighten_amt[region]),
+    id = paste(matrix, region)
+  )
+
+ggplot(derived, aes(x = region, y = matrix, fill = id)) +
+  geom_tile(colour = "white", linewidth = 1) +
+  scale_fill_manual(values = setNames(derived$fill_col, derived$id)) +
+  theme_minimal(base_size = 10) +
+  theme(legend.position = "none") +
+  labs(title = "One base hue per matrix, lightened by region", x = NULL, y = NULL)
+```
+
+- Any base palette works here (viridis, scico, a hand-picked set) —
+  `lighten()` operates on hex colours directly, not on a palette
+  object, so it composes with anything.
+- `colorspace::darken()`, `desaturate()`, and `saturate()` follow the
+  same pattern for the other direction/axis. `lighten()`/`darken()`
+  operate in HCL space by default (`method = "relative"` on chroma and
+  luminance together), which is why the result stays visually coherent
+  per hue instead of just washing out toward grey the way naively
+  blending toward white in RGB space would.
+- The failure mode to watch for: too many steps on one base hue and the
+  lightest/darkest ends stop being distinguishable from each other or
+  from the background — four steps (as here) was comfortably fine, this
+  wasn't stress-tested further.
+
+# Thematic vs statistically-even colour: does "water is blue" hold up?
+
+This is the real version of the question that prompted this section:
+`matrix` (Freshwater/Seawater/Groundwater/Air-Deposition) has an obvious
+thematic mapping — water is blue, ground is brown, air is pale — but
+"obvious" and "perceptually well-separated" are different properties,
+and only one of them is checkable by eye.
+
+```{r}
+#| label: fig-thematic-vs-statistical
+#| fig-cap: "A hand-picked thematic palette vs an algorithmically-spaced one"
+#| fig-width: 7
+#| fig-height: 3
+thematic <- c(
+  "Freshwater" = "#4C8FBB",
+  "Seawater" = "#0B4F6C",
+  "Groundwater" = "#7C6A5A",
+  "Air/Deposition" = "#C9D6DF"
+)
+statistical <- setNames(colorspace::qualitative_hcl(4, palette = "Dark 3"), matrices)
+
+swatch_df <- tibble(
+  matrix = rep(matrices, 2),
+  approach = rep(c("Thematic", "Statistical (qualitative_hcl)"), each = 4),
+  col = c(thematic[matrices], statistical[matrices])
+)
+
+ggplot(swatch_df, aes(x = matrix, y = approach, fill = col)) +
+  geom_tile(colour = "white", linewidth = 1.5) +
+  geom_text(aes(label = matrix), size = 3, colour = "white", fontface = "bold") +
+  scale_fill_identity() +
+  theme_minimal(base_size = 10) +
+  theme(axis.text.x = element_blank()) +
+  labs(x = NULL, y = NULL, title = "Thematic vs statistically-even matrix colours")
+```
+
+Both look like reasonable, distinguishable palettes at normal vision.
+The actual test is what happens under colour-vision deficiency —
+`colorspace::simulate_cvd()` (via the `deutan()`/`protan()`/`tritan()`
+wrappers) transforms a set of hex colours to approximate how each CVD
+type perceives them, without needing a human tester:
+
+```{r}
+#| label: fig-cvd-check
+#| fig-cap: "CVD simulation: thematic vs statistically-even matrix colours"
+#| fig-width: 9
+#| fig-height: 4
+cvd_check <- function(cols) {
+  list(
+    normal = cols,
+    deutan = colorspace::deutan(cols),
+    protan = colorspace::protan(cols),
+    tritan = colorspace::tritan(cols)
+  )
+}
+them_cvd <- cvd_check(thematic)
+stat_cvd <- cvd_check(statistical)
+
+cvd_df <- bind_rows(
+  lapply(names(them_cvd), function(v) {
+    tibble(approach = "Thematic", vision = v, matrix = matrices, col = them_cvd[[v]])
+  })
+) |>
+  bind_rows(
+    lapply(names(stat_cvd), function(v) {
+      tibble(approach = "Statistical", vision = v, matrix = matrices, col = stat_cvd[[v]])
+    })
+  ) |>
+  mutate(vision = factor(vision, levels = c("normal", "deutan", "protan", "tritan")))
+
+ggplot(cvd_df, aes(x = matrix, y = vision, fill = col)) +
+  geom_tile(colour = "white", linewidth = 1) +
+  scale_fill_identity() +
+  facet_wrap(~approach) +
+  theme_minimal(base_size = 9) +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+  labs(x = NULL, y = NULL, title = "CVD simulation: thematic vs statistical matrix colours")
+```
+
+::: {.callout-warning}
+## Found while testing: the "obvious" thematic palette separated worse than the algorithmic one
+
+Under `deutan`/`protan` simulation, the hand-picked thematic palette's
+four colours collapse toward similar dusty blue-grey/olive tones —
+Freshwater and Seawater in particular become hard to tell apart. The
+`qualitative_hcl` palette, picked with no thematic intent at all, keeps
+noticeably better separation under the same simulation.
+
+The reason isn't that thematic colour is inherently wrong — it's that
+eyeballing "photographically plausible" hues (water-blue, earth-brown,
+air-grey) tends to pick colours that already cluster in a similar
+tonal/lightness range, which is exactly the dimension CVD collapses
+hardest. A statistically-spaced palette doesn't have that bias because
+nothing about its construction cares what the colours "mean."
+
+**Practical takeaway, not "abandon theme": anchor hue thematically, then
+explicitly force the lightness/chroma spacing** rather than trusting
+eyeballed hex codes — e.g. pick each matrix's *hue* for its thematic
+association, but pass all four through `colorspace::qualitative_hcl()`
+(or manually set matching `l`/`c` values) so the spacing is actually
+even, then re-run this same CVD check before trusting the result. Theme
+gets you a starting hue; it doesn't get you a free pass on the actual
+spacing check.
+:::
+
+# What the pros do: restrained highlight palettes
+
+Data journalism (BBC, FT, and similar) mostly avoids this whole problem
+by not needing many colours at once: one accent colour for the thing the
+chart is actually about, everything else in a single neutral grey. Not
+using a dedicated package for this (`bbplot` isn't on CRAN, and adding a
+whole house-style package for one technique isn't worth the dependency
+for what's a five-line pattern) — just a named colour vector where every
+level except one maps to the same grey:
+
+```{r}
+#| label: fig-highlight
+#| fig-cap: "Restrained highlight: one accent colour, everything else grey"
+#| fig-width: 7
+#| fig-height: 4
+highlight_col <- setNames(
+  rep("grey80", length(regions)),
+  regions
+)
+highlight_col["Urban"] <- "#B2182B"
+
+ggplot(
+  water_quality |> mutate(is_urban = region == "Urban"),
+  aes(x = date, y = concentration, colour = region, alpha = is_urban)
+) +
+  geom_jitter(size = 1) +
+  scale_y_log10() +
+  scale_colour_manual(values = highlight_col, guide = "none") +
+  scale_alpha_manual(values = c(`TRUE` = 0.7, `FALSE` = 0.15), guide = "none") +
+  theme_minimal(base_size = 10) +
+  labs(
+    title = "Urban sites run consistently higher",
+    subtitle = "All other regions shown for context, de-emphasised",
+    x = NULL, y = "Concentration (ug/L, log scale)"
+  )
+```
+
+This isn't a competing option to the packages above so much as a
+reminder that **not every figure needs a full categorical palette** — if
+the actual finding is "one group differs from the rest," colour should
+say exactly that, not carry all eight/four categories at equal visual
+weight and make the reader do the comparison themselves.
+
+# References

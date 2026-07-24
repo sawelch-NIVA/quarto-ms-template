@@ -14,6 +14,8 @@ title: "Fonts in ggplot2: web fonts, local files, and three renderers"
 #| label: setup
 #| include: false
 library(ggplot2)
+library(ggtext)
+library(emoji)
 library(here)
 here::i_am("manuscript/supplementary/fonts-mre.qmd")
 ```
@@ -56,6 +58,21 @@ here::i_am("manuscript/supplementary/fonts-mre.qmd")
   with `png()` and watching it vanish with `ragg::agg_png()`. Fixed
   project-wide: `manuscript/_quarto.yml` now sets `knitr: opts_chunk:
   dev: "ragg_png"`.
+- **Colour emoji glyphs render correctly through `ragg::agg_png()`** -
+  worth stating plainly because it's not the safe assumption: most R
+  graphics devices historically could not draw colour (COLR/CBDT) emoji
+  fonts at all. Confirmed working here, not assumed.
+- **The real footgun isn't colour vs monochrome, it's whole-string font
+  overrides**: setting `element_text(family = "Noto Emoji")` for a title
+  that mixes an emoji with ordinary words visibly wrecked the Latin
+  text's spacing, because that font has no real Latin glyphs to fall
+  back on - confirmed side by side against the same override with an
+  OS-integrated colour emoji font, which didn't have this problem.
+  Isolating the emoji to its own `ggtext` span fixes it - but only once
+  the CSS `font-family` value is actually quoted; unquoted, a two-word
+  family name silently failed to match at all, confirmed by the glyph
+  rendering in the wrong (colour, not requested-monochrome) font with no
+  warning.
 :::
 
 # Why this notebook exists
@@ -317,5 +334,172 @@ later:
   downloadable static files, so it typically doesn't fit a reproducible
   pipeline like this one at all unless the specific font is separately
   licensed as a static file.
+
+# Emoji: a first pass
+
+An obvious next step from "fonts in ggplot2" - can a plot use icons the
+way a good piece of game UI does (*Civilization VI*'s yield/resource
+icons are a genuinely nice example: legible at a glance, consistent
+weight, sit inline with numbers)? Two real problems stand between "type
+an emoji" and that:
+
+1. Rendering an emoji **as the data mark itself** (`geom_point`-as-emoji)
+   is supported by more than one package - and almost never what you
+   actually want. Demonstrated, not just asserted, below.
+2. Icons used *properly* - inline with text, with real control over
+   size/margin/baseline - need either a font that behaves (most emoji
+   fonts don't, for ordinary Latin text sharing the same run) or an
+   actual image, which sidesteps font metrics entirely at the cost of
+   needing a real asset per icon instead of typing a character.
+
+This is a first pass at the package/font landscape, not a solved
+design system - scoped to "does the obvious thing work, and where does
+it break."
+
+## Does a colour emoji even render? (Yes - the harder question is what breaks around it)
+
+```{r}
+#| label: check-emoji-fonts
+droplet <- emoji::emoji("droplet")
+cat("Emoji-capable fonts on this machine:\n")
+print(systemfonts::system_fonts()$family[
+  grepl("emoji|symbol", systemfonts::system_fonts()$family, ignore.case = TRUE)
+])
+```
+
+```{r}
+#| label: fig-emoji-colour-whole-title
+#| fig-cap: "Colour emoji font, whole title set to that family"
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  labs(title = paste0(droplet, " Water yield (colour font, whole title)")) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(family = "Segoe UI Emoji"))
+```
+
+That renders correctly - a real colour droplet, ordinary-looking title
+text around it. **Not the safe assumption it looks like**: most R
+graphics devices historically couldn't draw colour (COLR/CBDT-format)
+emoji fonts at all, only monochrome outline glyphs. `ragg::agg_png()`
+(this project's device - see above) handles it fine, confirmed here, not
+assumed from `ragg`'s own documentation.
+
+## The actual footgun: whole-string family overrides don't degrade gracefully
+
+Swap the same approach to a *monochrome* emoji font (`"Noto Emoji"`,
+distinct from `"Noto Color Emoji"` - both are installed here, confirmed
+above):
+
+```{r}
+#| label: fig-emoji-mono-whole-title
+#| fig-cap: "Monochrome emoji font, whole title set to that family - breaks the Latin text too"
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  labs(title = paste0(droplet, " Water yield (monochrome font, whole title)")) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = element_text(family = "Noto Emoji"))
+```
+
+The ordinary words in the title are visibly, badly mis-spaced - `"Noto
+Emoji"` has no real Latin letterforms to fall back on, so the *whole*
+title's layout breaks, not just the glyph. `"Segoe UI Emoji"` above
+didn't have this problem because it's an OS-integrated font with its own
+sane fallback chain; a standalone downloaded emoji-only font isn't
+guaranteed the same courtesy. Setting `family` for an entire label is
+fine when it's genuinely one font's job (as everywhere else in this
+notebook) and a real risk the moment that label mixes an emoji with
+ordinary prose.
+
+The fix: isolate the emoji to its own `ggtext` span instead of setting
+`family` for the whole label.
+
+```{r}
+#| label: fig-emoji-mono-isolated
+#| fig-cap: "Same monochrome font, isolated to a ggtext span - Latin text unaffected"
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  labs(title = paste0(
+    "<span style=\"font-family:'Noto Emoji'\">", droplet, "</span> ",
+    "Water yield (isolated span, monochrome)"
+  )) +
+  theme_minimal(base_size = 14) +
+  theme(plot.title = ggtext::element_markdown())
+```
+
+::: {.callout-warning}
+## Found while testing: an unquoted CSS font-family name fails silently, not loudly
+
+The first version of the chunk above used
+`style="font-family:Noto Emoji"` (no quotes around the two-word family
+name) - it rendered *without error*, but the glyph came back in colour,
+not the requested monochrome font. `gridtext`/`ggtext`'s markdown-to-CSS
+parsing didn't match the unquoted multi-word name, silently fell back to
+something else, and R's normal font-substitution machinery picked a
+colour-capable font as the substitute rather than failing visibly.
+**Quoting the family name
+(`font-family:'Noto Emoji'`, single quotes inside the double-quoted HTML
+attribute) fixed it** - confirmed side by side, same code otherwise. A
+font-family mismatch here doesn't look like a bug; it looks like a
+plausible result with the wrong font, which is worse.
+:::
+
+## Package options
+
+- **`emoji`** (used above via `emoji::emoji("droplet")`) - a name→unicode
+  lookup table, nothing more. It doesn't render anything itself; it just
+  saves hunting for the raw code point. Names follow the standard
+  Unicode CLDR short-name convention.
+- **`ggtext`** (already used elsewhere in this project - see
+  [plots-mre.qmd](plots-mre.qmd)) - lets a label mix fonts within one
+  string via markdown/HTML spans, which is the actual mechanism that
+  makes isolating an emoji's font practical, per the callout above.
+- **`emojifont`** - an older package with its own `geom_emoji()` and its
+  own internal emoji-name registry, **not the same names as the `emoji`
+  package**:
+
+```{r}
+#| label: fig-emojifont-failure
+#| fig-cap: "emojifont::geom_emoji() with a valid, current Unicode short name"
+#| error: true
+ggplot(mtcars[1:5, ], aes(wt, mpg)) +
+  emojifont::geom_emoji("sheaf_of_rice", size = 0.05) +
+  theme_minimal(base_size = 14)
+```
+
+  `"sheaf_of_rice"` is a real, current Unicode CLDR name (it's what
+  `emoji::emoji()` uses successfully elsewhere in this section) -
+  `emojifont` doesn't recognise it, confirmed by the error above, not
+  assumed from its age. The two packages' emoji-name vocabularies aren't
+  interchangeable; picking one commits to its naming scheme.
+- **`ggimage`** (installed, **not exercised in this pass**) - treats an
+  icon as an actual image grob (`geom_image()`) rather than a font
+  glyph, which is the real answer to this notebook's problem 2 (font
+  typesetting doesn't give real control over icon margins/baseline/size
+  the way an image does) - at the cost of needing an actual image asset
+  per icon rather than typing a character. Worth a dedicated pass of its
+  own rather than folding in here.
+
+## Why "emoji as the data mark" is rarely what you want
+
+It does work:
+
+```{r}
+#| label: fig-emoji-as-marks
+#| fig-cap: "Emoji glyphs used directly as geom_text() marks"
+wheat <- emoji::emoji("sheaf_of_rice")
+ggplot(mtcars[1:5, ], aes(wt, mpg)) +
+  geom_text(label = wheat, family = "Segoe UI Emoji", size = 8) +
+  theme_minimal(base_size = 14) +
+  labs(title = "geom_text() with an emoji glyph directly")
+```
+
+Working is exactly the problem: at any size legible enough to read as an
+icon, five colourful, unevenly-weighted glyphs already dominate the
+plot's visual hierarchy more than the data does, they don't share a
+common visual "centre" the way a circle/triangle does (so precise
+position judgement suffers), and that gets worse, not better, as point
+count grows. Fine for a one-off illustration; a poor default for actual
+data marks, which is exactly what was suspected going in - confirmed
+here rather than just asserted.
 
 # References
