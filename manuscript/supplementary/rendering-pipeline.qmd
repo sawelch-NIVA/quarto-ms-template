@@ -1,7 +1,7 @@
 ---
 # ! Render via `targets::tar_make()` (the `render_manuscript` target in
 # ! _targets.R), not `quarto render` directly - see manuscript.qmd.
-title: "How a .qmd becomes html/docx/pdf: the compute → filter → convert pipeline"
+title: "Quarto rendering pipeline"
 ---
 
 ```{r}

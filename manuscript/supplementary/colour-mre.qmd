@@ -13,7 +13,7 @@
 #
 # To surface this notebook in the site navigation, see the comment in
 # supplementary/notebook-template.qmd.
-title: "Colour in ggplot2: palettes, colorspace, and semantics"
+title: "Colour: palettes, colorspace, and semantics"
 ---
 
 ```{r}
@@ -102,19 +102,33 @@ centred variable.
 matrices <- c("Freshwater", "Seawater", "Groundwater", "Air/Deposition")
 regions <- c("Coastal", "Upland", "Urban", "Agricultural")
 analytes <- c(
-  "PFOA", "PFOS", "Nitrate", "Lead", "Microplastics",
-  "Chloride", "Phosphate", "Cadmium"
+  "PFOA",
+  "PFOS",
+  "Nitrate",
+  "Lead",
+  "Microplastics",
+  "Chloride",
+  "Phosphate",
+  "Cadmium"
 )
 # Made-up but plausible guideline values (ug/L)
 guidelines <- c(
-  PFOA = 0.004, PFOS = 0.004, Nitrate = 50, Lead = 5,
-  Microplastics = 1, Chloride = 250, Phosphate = 0.1, Cadmium = 3
+  PFOA = 0.004,
+  PFOS = 0.004,
+  Nitrate = 50,
+  Lead = 5,
+  Microplastics = 1,
+  Chloride = 250,
+  Phosphate = 0.1,
+  Cadmium = 3
 )
 # Matrix/region multipliers give the data real (if fabricated) structure
 # instead of pure noise - urban/agricultural runoff runs higher, air
 # deposition lowest, etc.
 matrix_mult <- c(
-  "Freshwater" = 1, "Seawater" = 0.4, "Groundwater" = 0.6,
+  "Freshwater" = 1,
+  "Seawater" = 0.4,
+  "Groundwater" = 0.6,
   "Air/Deposition" = 0.15
 )
 region_mult <- c(Coastal = 0.8, Upland = 0.5, Urban = 1.8, Agricultural = 1.3)
@@ -149,19 +163,33 @@ things tell apart," including under colour-vision deficiency.
 #| fig-cap: "Concentration by analyte, five categorical palette approaches"
 #| fig-width: 8
 #| fig-height: 9
-p_base <- ggplot(water_quality, aes(x = analyte, y = concentration, fill = analyte)) +
+p_base <- ggplot(
+  water_quality,
+  aes(x = analyte, y = concentration, fill = analyte)
+) +
   geom_boxplot(outlier.size = 0.5) +
   scale_y_log10() +
   theme_minimal(base_size = 10) +
-  theme(legend.position = "none", axis.text.x = element_text(angle = 40, hjust = 1)) +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 40, hjust = 1)
+  ) +
   labs(x = NULL, y = "Concentration (ug/L, log scale)")
 
 p1 <- p_base + labs(title = "ggplot2 default hues")
-p2 <- p_base + scale_fill_brewer(palette = "Set2") + labs(title = "RColorBrewer 'Set2'")
-p3 <- p_base + scale_fill_viridis_d(option = "viridis") + labs(title = "viridis (discrete)")
-p4 <- p_base + scale_fill_manual(values = MetBrewer::met.brewer("Hokusai1", 8)) +
+p2 <- p_base +
+  scale_fill_brewer(palette = "Set2") +
+  labs(title = "RColorBrewer 'Set2'")
+p3 <- p_base +
+  scale_fill_viridis_d(option = "viridis") +
+  labs(title = "viridis (discrete)")
+p4 <- p_base +
+  scale_fill_manual(values = MetBrewer::met.brewer("Hokusai1", 8)) +
   labs(title = "MetBrewer 'Hokusai1'")
-p5 <- p_base + scale_fill_manual(values = colorspace::qualitative_hcl(8, palette = "Dark 3")) +
+p5 <- p_base +
+  scale_fill_manual(
+    values = colorspace::qualitative_hcl(8, palette = "Dark 3")
+  ) +
   labs(title = "colorspace qualitative_hcl 'Dark 3'")
 
 (p1 | p2) / (p3 | p4) / (p5 | plot_spacer())
@@ -203,21 +231,31 @@ than in the boxplots above.
 #| fig-height: 6
 heat_data <- water_quality |>
   group_by(region, analyte) |>
-  summarise(mean_pct_of_guideline = mean(concentration / guideline) * 100, .groups = "drop")
+  summarise(
+    mean_pct_of_guideline = mean(concentration / guideline) * 100,
+    .groups = "drop"
+  )
 
-p_heat_base <- ggplot(heat_data, aes(x = analyte, y = region, fill = mean_pct_of_guideline)) +
+p_heat_base <- ggplot(
+  heat_data,
+  aes(x = analyte, y = region, fill = mean_pct_of_guideline)
+) +
   geom_tile(colour = "white", linewidth = 0.5) +
   theme_minimal(base_size = 10) +
   theme(axis.text.x = element_text(angle = 40, hjust = 1)) +
   labs(x = NULL, y = NULL, fill = "% of\nguideline")
 
-h1 <- p_heat_base + scale_fill_gradient(low = "white", high = "#08306B") +
+h1 <- p_heat_base +
+  scale_fill_gradient(low = "white", high = "#08306B") +
   labs(title = "ggplot default gradient")
-h2 <- p_heat_base + scale_fill_distiller(palette = "Blues", direction = 1) +
+h2 <- p_heat_base +
+  scale_fill_distiller(palette = "Blues", direction = 1) +
   labs(title = "RColorBrewer distiller 'Blues'")
-h3 <- p_heat_base + scale_fill_viridis_c(option = "mako", direction = -1) +
+h3 <- p_heat_base +
+  scale_fill_viridis_c(option = "mako", direction = -1) +
   labs(title = "viridis 'mako' (reversed)")
-h4 <- p_heat_base + scale_fill_scico(palette = "davos", direction = -1) +
+h4 <- p_heat_base +
+  scale_fill_scico(palette = "davos", direction = -1) +
   labs(title = "scico 'davos' (reversed)")
 
 (h1 | h2) / (h3 | h4)
@@ -267,13 +305,22 @@ p_div_base <- ggplot(
   theme(axis.text.x = element_text(angle = 40, hjust = 1)) +
   labs(x = NULL, y = NULL, fill = "% over/under\nguideline")
 
-d1 <- p_div_base + scale_fill_gradient2(low = "blue", mid = "white", high = "red") +
+d1 <- p_div_base +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red") +
   labs(title = "ggplot default diverging")
-d2 <- p_div_base + scale_fill_fermenter(palette = "RdBu", direction = -1) +
+d2 <- p_div_base +
+  scale_fill_fermenter(palette = "RdBu", direction = -1) +
   labs(title = "RColorBrewer fermenter 'RdBu' (binned)")
-d3 <- p_div_base + scale_fill_steps2(low = "#2166AC", mid = "grey95", high = "#B2182B", midpoint = 0) +
+d3 <- p_div_base +
+  scale_fill_steps2(
+    low = "#2166AC",
+    mid = "grey95",
+    high = "#B2182B",
+    midpoint = 0
+  ) +
   labs(title = "scale_fill_steps2 (binned, custom hex)")
-d4 <- p_div_base + colorspace::scale_fill_binned_diverging(palette = "Blue-Red 3") +
+d4 <- p_div_base +
+  colorspace::scale_fill_binned_diverging(palette = "Blue-Red 3") +
   labs(title = "colorspace diverging_hcl (binned)")
 
 (d1 | d2) / (d3 | d4)
@@ -326,7 +373,11 @@ ggplot(derived, aes(x = region, y = matrix, fill = id)) +
   scale_fill_manual(values = setNames(derived$fill_col, derived$id)) +
   theme_minimal(base_size = 10) +
   theme(legend.position = "none") +
-  labs(title = "One base hue per matrix, lightened by region", x = NULL, y = NULL)
+  labs(
+    title = "One base hue per matrix, lightened by region",
+    x = NULL,
+    y = NULL
+  )
 ```
 
 - Any base palette works here (viridis, scico, a hand-picked set) —
@@ -362,7 +413,10 @@ thematic <- c(
   "Groundwater" = "#7C6A5A",
   "Air/Deposition" = "#C9D6DF"
 )
-statistical <- setNames(colorspace::qualitative_hcl(4, palette = "Dark 3"), matrices)
+statistical <- setNames(
+  colorspace::qualitative_hcl(4, palette = "Dark 3"),
+  matrices
+)
 
 swatch_df <- tibble(
   matrix = rep(matrices, 2),
@@ -372,11 +426,20 @@ swatch_df <- tibble(
 
 ggplot(swatch_df, aes(x = matrix, y = approach, fill = col)) +
   geom_tile(colour = "white", linewidth = 1.5) +
-  geom_text(aes(label = matrix), size = 3, colour = "white", fontface = "bold") +
+  geom_text(
+    aes(label = matrix),
+    size = 3,
+    colour = "white",
+    fontface = "bold"
+  ) +
   scale_fill_identity() +
   theme_minimal(base_size = 10) +
   theme(axis.text.x = element_blank()) +
-  labs(x = NULL, y = NULL, title = "Thematic vs statistically-even matrix colours")
+  labs(
+    x = NULL,
+    y = NULL,
+    title = "Thematic vs statistically-even matrix colours"
+  )
 ```
 
 Both look like reasonable, distinguishable palettes at normal vision.
@@ -403,15 +466,27 @@ stat_cvd <- cvd_check(statistical)
 
 cvd_df <- bind_rows(
   lapply(names(them_cvd), function(v) {
-    tibble(approach = "Thematic", vision = v, matrix = matrices, col = them_cvd[[v]])
+    tibble(
+      approach = "Thematic",
+      vision = v,
+      matrix = matrices,
+      col = them_cvd[[v]]
+    )
   })
 ) |>
   bind_rows(
     lapply(names(stat_cvd), function(v) {
-      tibble(approach = "Statistical", vision = v, matrix = matrices, col = stat_cvd[[v]])
+      tibble(
+        approach = "Statistical",
+        vision = v,
+        matrix = matrices,
+        col = stat_cvd[[v]]
+      )
     })
   ) |>
-  mutate(vision = factor(vision, levels = c("normal", "deutan", "protan", "tritan")))
+  mutate(
+    vision = factor(vision, levels = c("normal", "deutan", "protan", "tritan"))
+  )
 
 ggplot(cvd_df, aes(x = matrix, y = vision, fill = col)) +
   geom_tile(colour = "white", linewidth = 1) +
@@ -419,7 +494,11 @@ ggplot(cvd_df, aes(x = matrix, y = vision, fill = col)) +
   facet_wrap(~approach) +
   theme_minimal(base_size = 9) +
   theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
-  labs(x = NULL, y = NULL, title = "CVD simulation: thematic vs statistical matrix colours")
+  labs(
+    x = NULL,
+    y = NULL,
+    title = "CVD simulation: thematic vs statistical matrix colours"
+  )
 ```
 
 ::: {.callout-warning}
@@ -481,7 +560,8 @@ ggplot(
   labs(
     title = "Urban sites run consistently higher",
     subtitle = "All other regions shown for context, de-emphasised",
-    x = NULL, y = "Concentration (ug/L, log scale)"
+    x = NULL,
+    y = "Concentration (ug/L, log scale)"
   )
 ```
 

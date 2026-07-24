@@ -1,7 +1,7 @@
 ---
 # ! Render via `targets::tar_make()` (the `render_manuscript` target in
 # ! _targets.R), not `quarto render` directly - see manuscript.qmd.
-title: "Testing R/functions.R without a package structure"
+title: "Testing without a package structure"
 ---
 
 ```{r}
@@ -15,6 +15,8 @@ here::i_am("manuscript/supplementary/testing-mre.qmd")
 
 ::: {.callout-tip}
 # The Short Version
+- Testing is never not a bad idea - checking is always better than assuming.
+- Adding more packages (such as `testthat`) means more things to break.
 - Tests live in `tests/testthat/`, run with `testthat::test_dir("tests/testthat")`
   - there's no `DESCRIPTION`/`NAMESPACE` here, so the usual package-testing
   entry points (`devtools::test()`, `R CMD check`) don't apply.

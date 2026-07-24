@@ -6,7 +6,7 @@
 # template: a session-wide theme, ggtext markdown text (including a real,
 # confirmed bug), and combining plots with patchwork - including a table
 # grob alongside a plot grob.
-title: "ggplot2: session themes, markdown text, and patchwork"
+title: "ggplot2: Themes and extensions"
 ---
 
 ```{r}

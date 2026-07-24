@@ -7,7 +7,7 @@
 # the docx reference-doc, typst mainfont) already covered in CLAUDE.md,
 # which is a completely separate mechanism from what this notebook is
 # about.
-title: "Fonts in ggplot2: web fonts, local files, and three renderers"
+title: "Fonts in ggplot2: sources and renderers"
 ---
 
 ```{r}
@@ -111,8 +111,16 @@ already documented, and needs its own fix.
 #| label: check-installed-fonts
 library(systemfonts)
 fonts <- system_fonts()
-cat("Fira Sans installed on this machine:", any(grepl("Fira Sans", fonts$family)), "\n")
-cat("Fira Code installed on this machine:", any(grepl("Fira Code", fonts$family)), "\n")
+cat(
+  "Fira Sans installed on this machine:",
+  any(grepl("Fira Sans", fonts$family)),
+  "\n"
+)
+cat(
+  "Fira Code installed on this machine:",
+  any(grepl("Fira Code", fonts$family)),
+  "\n"
+)
 ```
 
 Both are installed here - confirmed above, not assumed - which is exactly
@@ -418,10 +426,14 @@ The fix: isolate the emoji to its own `ggtext` span instead of setting
 #| fig-cap: "Same monochrome font, isolated to a ggtext span - Latin text unaffected"
 ggplot(mtcars, aes(wt, mpg)) +
   geom_point() +
-  labs(title = paste0(
-    "<span style=\"font-family:'Noto Emoji'\">", droplet, "</span> ",
-    "Water yield (isolated span, monochrome)"
-  )) +
+  labs(
+    title = paste0(
+      "<span style=\"font-family:'Noto Emoji'\">",
+      droplet,
+      "</span> ",
+      "Water yield (isolated span, monochrome)"
+    )
+  ) +
   theme_minimal(base_size = 14) +
   theme(plot.title = ggtext::element_markdown())
 ```

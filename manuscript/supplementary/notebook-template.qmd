@@ -15,7 +15,7 @@
 #
 # Leave it unlinked to keep it off the public nav (e.g. a scratch
 # notebook) - it still renders, just isn't listed.
-title: "Supplementary Notebook Title"
+title: "Notebook Template"
 ---
 
 # Purpose

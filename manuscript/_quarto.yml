@@ -63,22 +63,16 @@ website:
         - section: "Aesthetics" # Visual output: figures, tables, colour, fonts
           contents:
             - href: supplementary\images-mre.qmd
-              text: "Rendering Images in Quarto"
               icon: journal-code
             - href: supplementary\diagrams-mre.qmd
-              text: "Diagrams: Graphviz, cetz, ggraph"
               icon: journal-code
             - href: supplementary\colour-mre.qmd
-              text: "Colour: palettes, colorspace, semantics"
               icon: journal-code
             - href: supplementary\tables-mre.qmd
-              text: "Rendering Tables in Quarto"
               icon: journal-code
             - href: supplementary\plots-mre.qmd
-              text: "ggplot2: Themes, Markdown, patchwork"
               icon: journal-code
             - href: supplementary\fonts-mre.qmd
-              text: "Fonts in ggplot2"
               icon: journal-code
         - section: "Infrastructure" # Build/render/test mechanics, not visual output
           contents:
@@ -113,10 +107,8 @@ format:
     number-sections: true
     lightbox: true  # enable click-to-zoom images
     # default HTML dimensions are a bit narrow (note that styles.css will override these)
-    # grid:
-    #   sidebar-width: 250px
-    #   body-width: 700px
-    #   margin-width: 300px
+    grid:
+      sidebar-width: 400px
     citeproc: true # needed?
 
 
