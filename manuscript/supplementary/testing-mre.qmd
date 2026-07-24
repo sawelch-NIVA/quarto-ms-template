@@ -1,0 +1,107 @@
+---
+# ! Render via `targets::tar_make()` (the `render_manuscript` target in
+# ! _targets.R), not `quarto render` directly - see manuscript.qmd.
+title: "Testing R/functions.R without a package structure"
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(here)
+here::i_am("manuscript/supplementary/testing-mre.qmd")
+```
+
+{{< include _back-to-manuscript.qmd >}}
+
+::: {.callout-tip}
+# The Short Version
+- Tests live in `tests/testthat/`, run with `testthat::test_dir("tests/testthat")`
+  - there's no `DESCRIPTION`/`NAMESPACE` here, so the usual package-testing
+  entry points (`devtools::test()`, `R CMD check`) don't apply.
+- `tests/testthat/helper.R` sources `R/functions.R` once for every test
+  file - the stand-in for `library(pkg)`, which a package's own tests get
+  for free.
+- Coverage is deliberately barebones: `detect_render_format()` (the one
+  function with real, previously-buggy branch logic - see its own roxygen
+  comment) and a smoke test per export helper that just checks a file
+  actually gets written.
+- `.github/workflows/render.yml` runs the suite before the pipeline build,
+  so a broken helper function fails as a named test rather than a
+  confusing render error - see [ci-pipeline.qmd](ci-pipeline.qmd).
+:::
+
+# Why this notebook exists
+
+`R/functions.R` has real branch logic worth protecting against
+regressions - `detect_render_format()`'s own roxygen comment documents a
+concrete bug a previous version had (silently broken whenever
+`QUARTO_EXECUTE_INFO` was unset). That kind of bug is exactly what a test
+catches immediately and a manual render might not, since the broken branch
+only triggers in specific circumstances (a standalone knit, or
+`tar_quarto()`'s dependency-scan pass - see CLAUDE.md's "Pipeline
+gotchas"). This notebook exists because "why is there a `tests/` folder in
+a manuscript template, and why does it look different from a package's
+tests" isn't self-explanatory from the files alone.
+
+# Why not a normal package test setup
+
+The standard `usethis::use_testthat()` workflow assumes a package: a
+`DESCRIPTION` with `Suggests: testthat`, a `NAMESPACE`, and `R CMD check`
+or `devtools::test()` doing the loading for you via `pkgload`. This
+template deliberately isn't a package (see CLAUDE.md's "Core architectural
+decision" for the equivalent reasoning about the Quarto project type) -
+adding full package scaffolding just to get test infrastructure would be a
+lot of ceremony for five tests. Instead:
+
+- `tests/testthat/helper.R` is testthat's own convention for a file
+  auto-loaded before every test file in the directory - normally used for
+  shared fixtures in a package's tests, repurposed here to do the one
+  thing `devtools::load_all()` would otherwise handle: source
+  `R/functions.R` so its functions exist in the test session.
+- Tests are run directly with `testthat::test_dir("tests/testthat")`,
+  which only needs a directory of `test-*.R` files - it doesn't care
+  whether a package wraps them.
+
+```{r}
+#| label: run-tests
+#| eval: false
+testthat::test_dir(here("tests/testthat"))
+```
+
+(Not run as part of the manuscript render - `eval: false` above - since a
+test failure should stop CI before the render even starts, per
+[ci-pipeline.qmd](ci-pipeline.qmd), not surface as a broken chunk in the
+rendered notebook.)
+
+# What's actually tested
+
+`tests/testthat/test-detect-render-format.R` - three cases:
+
+- `QUARTO_EXECUTE_INFO` unset → every `is_*` flag `FALSE`, `ext` is `NA`,
+  not an error or a missing field. This is the exact contract the
+  function's roxygen comment promises, and the exact thing the previous
+  hand-rolled version got wrong.
+- A JSON file with `target-format: "docx"` → `is_docx` `TRUE`, the other
+  two flags `FALSE`, `ext = "docx"`.
+- A JSON file with `target-format: "typst"` → `ext = "pdf"`, not
+  `"typst"` - typst compiles to a PDF on disk (see
+  [rendering-pipeline.qmd](rendering-pipeline.qmd)), and this is the one
+  format/extension mismatch in the whole function worth pinning down
+  explicitly rather than trusting it stays correct by accident.
+
+`tests/testthat/test-exports.R` - one smoke test each for
+`export_table_docx()` and `export_figure_tiff()`: build a trivial
+flextable/ggplot object, export it to a `withr::local_tempdir()`, check
+the expected file actually exists at the expected path. Deliberately not
+testing docx/TIFF internals - that's what
+[tables-mre.qmd](tables-mre.qmd)/[images-mre.qmd](images-mre.qmd) already
+do by rendering real output and inspecting it by hand; these tests only
+catch "this function no longer writes a file where it claims to."
+
+**Not tested:** `flextable_use_format_font()`. Checking it picked the
+right font would mean introspecting a flextable object's internal
+`fp_text` structure per format, which is more machinery than "barebones"
+was meant to cover - if this function grows more format-specific branches,
+it's the next candidate for a real test.
+
+# References

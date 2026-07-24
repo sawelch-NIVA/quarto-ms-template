@@ -6,8 +6,19 @@
 library(ggplot2)
 
 build_fig_01_example <- function(data, model) {
-  ggplot(data, aes(x, y)) +
-    geom_point() +
-    geom_abline(intercept = model[["(Intercept)"]], slope = model[["x"]]) +
+  # model[["grouptreatment"]] is lm()'s default coefficient name for factor
+  # `group`'s "treatment" level (varname + level, no separator) - matches
+  # the "measurement ~ group" formula in _targets.R's calculate_model.
+  fitted_means <- data.frame(
+    group = c("control", "treatment"),
+    measurement = c(
+      model[["(Intercept)"]],
+      model[["(Intercept)"]] + model[["grouptreatment"]]
+    )
+  )
+
+  ggplot(data, aes(group, measurement)) +
+    geom_jitter(width = 0.1) +
+    geom_point(data = fitted_means, color = "red", size = 3, shape = 18) +
     theme_bw()
 }

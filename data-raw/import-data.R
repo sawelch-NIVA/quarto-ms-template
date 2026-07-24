@@ -2,7 +2,7 @@
 # One-time import/cleaning script, following the usethis::use_data_raw()
 # convention: raw input lives in data-raw/ (tracked in git), the
 # cleaned/processed result is written to data/ (git-ignored, regenerated
-# from here rather than the pipeline - see data-raw/README.md). Run
+# from here rather than the pipeline - see data-raw/data-raw-readme.md). Run
 # manually when the raw file changes; not sourced by tar_source() or
 # wired into _targets.R, since raw input doesn't change on every pipeline
 # run the way computed targets do.

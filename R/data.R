@@ -1,7 +1,7 @@
 # R/data.R ----
 # Documents the object data-raw/import-data.R produces, in the same style
 # an R package documents a bundled dataset (roxygen block + bare quoted
-# name) - see data-raw/README.md for how the two files relate. This file
+# name) - see data-raw/data-raw-readme.md for how the two files relate. This file
 # has no side effects, so tar_source() sourcing it on every pipeline load
 # is harmless.
 

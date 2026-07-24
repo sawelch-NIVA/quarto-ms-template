@@ -1,0 +1,78 @@
+name: Render manuscript
+
+# Rebuilds the whole targets pipeline and renders manuscript/ on every push
+# and PR - catches the class of bug this template has hit by hand (docx
+# corruption, one bad image format silently stalling html/docx too, a
+# render that works locally but not from a clean checkout) automatically,
+# instead of only when someone remembers to render all three formats. See
+# manuscript/supplementary/ci-pipeline.qmd for the full writeup.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      # No DESCRIPTION file (this isn't an R package), so packages are
+      # listed explicitly - keep this list in sync with runme.R's
+      # required_pkgs. setup-r-dependencies also installs the Ubuntu
+      # system libraries these packages need (libcurl, libmagick++, Cairo,
+      # ...) via pak's sysreqs database, which plain install.packages()
+      # does not.
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          packages: |
+            targets
+            tarchetypes
+            quarto
+            tibble
+            here
+            jsonlite
+            kableExtra
+            gt
+            flextable
+            huxtable
+            DT
+            ggplot2
+            magick
+            svglite
+            testthat
+            withr
+
+      - uses: quarto-dev/quarto-actions/setup@v2
+
+      # Closes the one documented-but-unverified-locally gap: without
+      # rsvg-convert, docx SVG embedding has no raster fallback (see
+      # images-mre.qmd). Installing it here means CI's docx render is
+      # actually clean, not just "didn't error."
+      - name: Install rsvg-convert (docx SVG embedding)
+        run: sudo apt-get update && sudo apt-get install -y librsvg2-bin
+
+      - name: Run tests
+        run: Rscript -e 'testthat::test_dir("tests/testthat", stop_on_failure = TRUE)'
+
+      - name: Import example raw data
+        run: Rscript -e 'source("data-raw/import-data.R")'
+
+      - name: Build pipeline and render manuscript
+        run: Rscript -e 'targets::tar_make()'
+
+      # Uploaded even on failure (if: always()) - a stale/partial
+      # output/ is itself useful for debugging the exact "one format
+      # failed, others look fine" gotcha documented in CLAUDE.md.
+      - name: Upload rendered manuscript
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: manuscript-output
+          path: manuscript/output/
+          if-no-files-found: ignore

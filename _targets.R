@@ -27,13 +27,25 @@ suppressMessages(
 )
 # Target names are verbs (every target is an action, not just its output noun).
 list(
+  # example_data_file tracks data/example-data.rds by content hash
+  # (format = "file") so import_data reruns when the file changes, even
+  # though targets can't see inside readRDS()'s external file access on
+  # its own - same idiom export_tables/export_figures use below. The rds
+  # itself comes from data-raw/import-data.R, a one-time script run
+  # manually (see data-raw/data-raw-readme.md), not part of this pipeline -
+  # a fresh clone's runme.R generates it before the first tar_make().
   tar_target(
-    name = simulate_data,
-    command = tibble(x = rnorm(100), y = rnorm(100))
+    name = example_data_file,
+    command = here("data/example-data.rds"),
+    format = "file"
+  ),
+  tar_target(
+    name = import_data,
+    command = readRDS(example_data_file)
   ),
   tar_target(
     name = calculate_model,
-    command = coefficients(lm(y ~ x, data = simulate_data))
+    command = coefficients(lm(measurement ~ group, data = import_data))
   ),
   # One target per table/figure, calling out to its own file
   # (tables/tbl-01-example.R, figures/fig-01-example.R). Upstream targets
@@ -48,7 +60,7 @@ list(
   ),
   tar_target(
     name = fig_01_example,
-    command = build_fig_01_example(simulate_data, calculate_model)
+    command = build_fig_01_example(import_data, calculate_model)
   ),
   # Standalone submission exports - separate targets from render_manuscript
   # below, not chunks inside it: export_figures writes TIFFs, and a TIFF

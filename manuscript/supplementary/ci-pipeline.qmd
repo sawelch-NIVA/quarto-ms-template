@@ -1,0 +1,124 @@
+---
+# ! Render via `targets::tar_make()` (the `render_manuscript` target in
+# ! _targets.R), not `quarto render` directly - see manuscript.qmd.
+title: "Continuous integration: rebuilding the pipeline on every push"
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(here)
+here::i_am("manuscript/supplementary/ci-pipeline.qmd")
+```
+
+{{< include _back-to-manuscript.qmd >}}
+
+::: {.callout-tip}
+# The Short Version
+- `.github/workflows/render.yml` runs `targets::tar_make()` on every push
+  and PR - a fresh clone rebuilds the pipeline and renders html/docx/typst
+  from scratch, on a machine that isn't anyone's local setup.
+- No `DESCRIPTION` file exists (this isn't an R package), so R packages
+  are listed explicitly in the workflow and must be kept in sync with
+  `runme.R`'s `required_pkgs` by hand - there's no single source of truth
+  for the package list.
+- `r-lib/actions/setup-r-dependencies` also installs the Ubuntu system
+  libraries these packages need (libcurl, libmagick++, Cairo, ...) via
+  `pak`'s sysreqs database - plain `install.packages()` on a bare runner
+  would fail on several of these without it.
+- CI installs `rsvg-convert`, closing the one gap this template could
+  never verify locally (this development environment has no
+  Word/LibreOffice or `rsvg-convert` - see
+  [images-mre.qmd](images-mre.qmd)'s SVG section) - CI's docx render is
+  clean where the local one has an unavoidable warning.
+- Rendered output uploads as a workflow artifact even on failure, since a
+  partial `output/` (some formats rendered, one didn't) is itself the
+  useful debugging signal for the "one bad format blocks the others"
+  gotcha documented in CLAUDE.md.
+:::
+
+# Why this notebook exists
+
+Every bug this template's other notebooks document
+([rendering-pipeline.qmd](rendering-pipeline.qmd),
+[tables-mre.qmd](tables-mre.qmd), [images-mre.qmd](images-mre.qmd)) was
+found by rendering locally and noticing something wrong - docx corruption,
+a typst error, stale output. None of that requires a human to remember to
+check all three formats after every change; a CI job does it automatically
+and would have caught several of these regressions the moment they were
+introduced, not whenever someone next happened to render typst.
+
+# What the workflow actually does
+
+```{mermaid}
+%%| label: fig-ci-flowchart
+%%| fig-cap: "One push, one clean-room rebuild of the whole pipeline"
+flowchart TD
+    A[push / pull_request] --> B["checkout"]
+    B --> C["setup-r + setup-r-dependencies<br/>(installs R packages + Ubuntu sysreqs)"]
+    C --> D["quarto-actions/setup<br/>(installs Quarto CLI)"]
+    D --> E["apt-get install librsvg2-bin"]
+    E --> F["testthat::test_dir()"]
+    F --> G["source data-raw/import-data.R"]
+    G --> H["targets::tar_make()"]
+    H --> I["upload manuscript/output/ as an artifact"]
+```
+
+Each step, and why it's there:
+
+1. **`actions/checkout`** - the usual first step, nothing template-specific.
+2. **`r-lib/actions/setup-r` + `setup-r-dependencies`** - installs R itself,
+   then the packages this template needs. Because there's no
+   `DESCRIPTION` file, `setup-r-dependencies` takes an explicit `packages:`
+   list rather than reading it from a manifest - this list has to be
+   maintained by hand alongside `runme.R`'s `required_pkgs`, and the two
+   can drift if one is updated without the other.
+3. **`quarto-dev/quarto-actions/setup`** - installs the Quarto CLI itself,
+   separately from R. Pandoc and the typst compiler both come bundled with
+   Quarto (see [rendering-pipeline.qmd](rendering-pipeline.qmd)), so no
+   further install is needed for either.
+4. **`librsvg2-bin`** - closes the SVG→docx gap documented in
+   [images-mre.qmd](images-mre.qmd): without `rsvg-convert` on `PATH`,
+   pandoc embeds a raw SVG in docx with no raster fallback. This
+   development environment never had it installed, so that gap was always
+   "unverified-risky" locally; CI is the first place it's actually closed.
+5. **`testthat::test_dir("tests/testthat", stop_on_failure = TRUE)`** -
+   runs before the pipeline build, so a broken `detect_render_format()` or
+   export helper fails fast with a clear test name instead of surfacing as
+   a confusing render error further down. See
+   [testing-mre.qmd](testing-mre.qmd) for the test setup itself.
+6. **`source("data-raw/import-data.R")`** - a fresh runner has no
+   `data/` folder (git-ignored), so the pipeline's `import_data` target has
+   nothing to read until this runs once. Mirrors what `runme.R` does for a
+   first-time local setup (see
+   [`data-raw/data-raw-readme.md`](../../data-raw/data-raw-readme.md)).
+7. **`targets::tar_make()`** - builds every target and renders `manuscript/`
+   in all three formats, exactly as it would locally.
+8. **`actions/upload-artifact`**, with `if: always()` - runs even if
+   `tar_make()` fails partway through, so a partial `manuscript/output/`
+   (e.g. html/docx present, typst missing after a hard failure) is
+   downloadable from the workflow run for debugging, not just a red X with
+   no further detail.
+
+# What this doesn't do
+
+No caching of R package installs or the `_targets/`/`_freeze/` stores
+across runs - every run is a genuinely clean rebuild, which is the point
+(it's what actually exercises the "does this work from a fresh clone"
+question), but it also means every run pays the full install + render
+cost. If render time becomes a problem, `actions/cache` keyed on the
+package list and lockfile would be the next thing to add - not done here
+to keep this workflow's failure modes easy to reason about while the
+template is still this new.
+
+**Not independently confirmed in this session:** the pipeline steps above
+were run and verified locally (`tar_make()` completing all eight targets,
+correct pipeline output), but the actual GitHub Actions execution of this
+exact workflow - runner provisioning, `setup-r-dependencies`' sysreqs
+resolution on a real Ubuntu runner, whether every package installs cleanly
+in that environment - hasn't been observed running in CI itself. Push this
+and check the Actions tab before trusting it fully; treat the workflow as
+"should work" rather than "confirmed working," unlike most of the other
+findings in this template's notebooks.
+
+# References

@@ -18,10 +18,11 @@ layout" in the repo root's README.md/CLAUDE.md). Mirrors the
   dataset (roxygen block + bare quoted object name). Keep that
   documentation in sync with `import-data.R` if the columns ever change.
 
-**Not currently wired into `_targets.R`:** the pipeline's `simulate_data`
-target generates synthetic data inline (`rnorm()`) rather than reading
-`data/example-data.rds`. This example shows the raw-data pattern this
-template expects you to follow; when you have real data, either point
-`simulate_data` (or a new target) at `tar_read()`-able output from this
-folder, or add a target that calls `readRDS(here("data/example-data.rds"))`
-directly.
+**Wired into `_targets.R`:** `example_data_file` tracks
+`data/example-data.rds` by content (`format = "file"`), `import_data`
+reads it, and `calculate_model` fits `lm(measurement ~ group, data =
+import_data)` - the actual example table/figure in the manuscript come
+from this raw file, not synthetic data. `runme.R` runs
+`data-raw/import-data.R` on first setup if `data/example-data.rds` doesn't
+exist yet; re-run it by hand (`source("data-raw/import-data.R")`) after
+editing the raw csv, since it isn't part of `_targets.R` itself.

@@ -69,6 +69,12 @@ website:
             - href: supplementary\tables-mre.qmd
               text: "Rendering Tables in Quarto"
               icon: journal-code
+            - href: supplementary\ci-pipeline.qmd
+              text: "Continuous Integration"
+              icon: journal-code
+            - href: supplementary\testing-mre.qmd
+              text: "Testing R/functions.R"
+              icon: journal-code
         - section: "Appendices" # Static files
 
 format: 

@@ -52,7 +52,7 @@ in Word/PDF) - it looks bad, and you can't reference it.
 # the repo root under this project's actual tar_quarto() render - see
 # CLAUDE.md). here("_targets") works either way since here() resolves via
 # upward sentinel search, not cwd.
-data <- tar_read(simulate_data, store = here("_targets"))
+data <- tar_read(import_data, store = here("_targets"))
 head(data)
 ```
 
