@@ -17,7 +17,7 @@ without re-litigating that.
 
 **Always render via `targets::tar_make()`, never `quarto render`
 directly**, except for quick iteration on a single file while writing it.
-`manuscript/index.qmd` and any notebook using `tar_read()`/`tar_load()`
+`manuscript/manuscript.qmd` and any notebook using `tar_read()`/`tar_load()`
 depends on the `_targets/` data store; a direct render can silently pick
 up stale or missing data. Every `.qmd` has a YAML-comment reminder of
 this. `_targets.R` has one `tar_quarto(name = render_site, path =
@@ -41,8 +41,8 @@ produces html+docx+typst together, no need for per-format targets.
   own path relative to the **repo root** (where `.git`/`_targets.R`
   live) — not the file's path relative to `manuscript/`, and not the path
   of whatever it's trying to reach (easy to get backwards). E.g.
-  `manuscript/index.qmd` calls `here::i_am("manuscript/index.qmd")`, not
-  `here::i_am("index.qmd")`.
+  `manuscript/manuscript.qmd` calls `here::i_am("manuscript/manuscript.qmd")`,
+  not `here::i_am("manuscript.qmd")`.
 - **`tar_read()`/`tar_load()` calls anywhere under `manuscript/` need an
   explicit `store = here::here("_targets")` argument** — see "Directory
   layout" below for why this is required, not defensive styling.
@@ -68,7 +68,7 @@ manuscript/      a SELF-CONTAINED Quarto project, one level below the repo root 
                    output-dir MUST resolve inside manuscript/ (currently just
                    `output`, i.e. manuscript/output/) — see the warning below,
                    this isn't a style preference.
-  index.qmd        the manuscript
+  manuscript.qmd   the manuscript
   tables/          one build file (tbl-NN-slug.R) + include partial
                    (_tbl-NN-slug.qmd) per table — see "Standalone submission
                    exports" below
@@ -98,21 +98,56 @@ main project directory`, and in practice scattered rendered output across
 three different locations in one render (a stray `index_files/` at the
 repo root, a full duplicate render dropped directly in `manuscript/`, and
 the intended `output/`) instead of writing cleanly to one place. This was
-very likely the root cause of two separate-looking bugs at once: a
-recurring typst `file not found` error for intermediate `_files/` images,
-and a `manuscript/output/index.docx` that Word reported as corrupted and
-needing repair (isolated to the flextable-produced table by testing —
-commenting the table out stopped the repair prompt). After moving
-`output-dir` back inside `manuscript/`: a full clean rebuild reproduced
-correctly with output landing in exactly one place, and direct inspection
-of the docx's internal OOXML (`[Content_Types].xml`, `document.xml`,
-`_rels/document.xml.rels` — checked for XML well-formedness and that
-every `r:id`/`r:embed` reference resolves to an existing relationship
-target, since that's specifically what triggers Word's repair prompt)
-came back clean, with no missing relationship targets and no dangling
-references — Word itself wasn't available to confirm the repair prompt
-is gone (no Word/LibreOffice in this environment), so treat this as
-strong-but-not-visually-confirmed.
+very likely the root cause of a recurring typst `file not found` error for
+intermediate `_files/` images. After moving `output-dir` back inside
+`manuscript/`: a full clean rebuild reproduced correctly with output
+landing in exactly one place, and direct inspection of the docx's internal
+OOXML (`[Content_Types].xml`, `document.xml`, `_rels/document.xml.rels` —
+checked for XML well-formedness and that every `r:id`/`r:embed` reference
+resolves to an existing relationship target) came back clean, with no
+missing relationship targets and no dangling references.
+
+**A second, separate docx "Word found unreadable content" bug recurred
+after the output-dir fix above — don't assume that fix covers every table
+corruption symptom, it doesn't.** At the time `output-dir` was fixed, a
+`manuscript/output/manuscript.docx` repair prompt was (incorrectly) attributed
+entirely to it, on the strength of one test (commenting out the
+flextable-produced table stopped the prompt) — that test only proved the
+table was *involved*, not that `output-dir` was the cause. The prompt came
+back later on unrelated renders with `output-dir` already correct. The
+actual root cause: **any docx table whose caption is crossreferenced
+(`@tbl-foo`) triggers "unreadable content" specifically when the caption
+renders above the table** (`tbl-cap-location: top`, docx's default) —
+this is an upstream, still-open Quarto bug
+([quarto-dev/quarto-cli#7321](https://github.com/quarto-dev/quarto-cli/issues/7321)),
+not a misconfiguration in this template, and it affects `flextable`
+output specifically (the table package this project uses everywhere per
+"R table packages" below) though the upstream thread suggests it isn't
+exclusive to it. Even the Quarto maintainer who investigated it directly
+couldn't identify the specific malformed XML causing Word's complaint;
+independently checking a minimal repro in this session (a crossreferenced
+`flextable` table rendered through this project's own reference doc, top-
+vs bottom-caption) reproduced the same inconclusiveness — relationship
+IDs, bookmarks, and generic XSD structure validation were all identical
+between the two, so whatever Word actually objects to isn't visible at
+that level either. **Fix, confirmed working by direct testing in real
+Word:** `manuscript/_quarto.yml`'s `format.docx` sets
+`tbl-cap-location: bottom`, moving every table caption below its table.
+This is a docx-only setting — it's nested under `format.docx` in
+`manuscript/_quarto.yml`, not set at the document's top level — so html
+and typst are unaffected and keep Quarto's own default of caption-above-
+table for both: confirmed directly in this project's own rendered output,
+`manuscript/output/manuscript.html`'s table caption carries class
+`quarto-float-caption-top`, and `pdftotext`-extracting
+`manuscript/output/manuscript.pdf` shows the "Table 1: ..." caption line
+printed before the table body, same as docx's own pre-fix default. There's
+also no known way to scope the docx fix to crossreferenced tables only —
+`tbl-cap-location: bottom` is document-wide within docx, so every docx
+table caption in this project now renders below its table, whether or not
+that particular table is crossreferenced. Word itself wasn't available in
+this Claude Code session to visually confirm the repair prompt is gone (no
+Word/LibreOffice installed in this environment) — that confirmation came
+from the user testing directly in real Word, not from this session.
 
 **Why `manuscript/` is isolated as its own nested Quarto project in the
 first place, separate from the output-dir bug above:** Quarto's freeze
@@ -134,6 +169,33 @@ and fail to find it. Fix used throughout `manuscript/`: pass
 `store = here::here("_targets")` explicitly to every `tar_read()`/
 `tar_load()` call — confirmed by direct testing this is genuinely
 required, not just defensive.
+
+**Correction, confirmed by direct testing while debugging an unrelated
+`source()` failure: `execute-dir: project` does NOT reliably mean
+`cwd = manuscript/` during chunk execution — it depends on how Quarto
+itself was invoked, not just this setting.** A plain `quarto render
+manuscript` (or `quarto::quarto_render()` called directly) does give
+`cwd = manuscript/`, matching the explanation above and Quarto's own docs
+for `execute-dir: project`. But this project's actual render path,
+`tarchetypes::tar_quarto()` (the `render_manuscript` target), gives
+`cwd = ` **the repo root** instead, at least in the installed Quarto/
+tarchetypes versions used here — confirmed directly with a
+`getwd()`/`list.files()` dump inside a knitr chunk, comparing the two
+invocation paths side by side. This had never surfaced as a bug before
+because every existing `tar_read()`/`tar_load()` call already used the
+explicit `store = here::here("_targets")` workaround above rather than
+relying on cwd - so the underlying cwd assumption was untested rather
+than confirmed. It only became visible when a *new* chunk used a plain
+cwd-relative path (`source("../R/functions.R")`) instead of
+`here::here(...)`, which worked under a direct `quarto render` but failed
+with `cannot open the connection` under `tar_quarto()` specifically.
+**Practical upshot: never write a cwd-relative path in any
+`manuscript/**/*.qmd` or partial, even ones that appear to only ever get
+rendered through `quarto render` during interactive testing — use
+`here::here(...)` (anchored via that file's own `here::i_am()`, called
+before the path is needed) for every file path, exactly as CLAUDE.md
+already prescribes elsewhere, but now for a second, independently
+confirmed reason beyond the `tar_read()`/`tar_load()` case above.**
 
 ## Confirmed by direct testing, not assumed
 
@@ -321,7 +383,7 @@ wouldn't be tracked otherwise.
 Embedding into the manuscript goes through a thin include partial per
 table/figure — `manuscript/tables/_tbl-01-example.qmd` /
 `manuscript/figures/_fig-01-example.qmd` — pulled into
-`manuscript/index.qmd` via `{{< include >}}`. The leading underscore
+`manuscript/manuscript.qmd` via `{{< include >}}`. The leading underscore
 matters: it's the standard Quarto convention (same idea as `_quarto.yml`,
 `_freeze`, `_targets`) that keeps the website-project renderer from also
 rendering these partials as their own standalone pages. Confirmed by

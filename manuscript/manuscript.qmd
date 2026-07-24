@@ -1,8 +1,8 @@
 ---
-# Render this project via `targets::tar_make()` (the `render_site` target in
-# _targets.R), not `quarto render index.qmd` directly — this file reads
-# pipeline outputs with tar_read()/tar_load(), so a direct render can use
-# stale or missing data if the pipeline hasn't been run.
+# Render this project via `targets::tar_make()` (the `render_manuscript`
+# target in _targets.R), not `quarto render manuscript.qmd` directly — this
+# file reads pipeline outputs with tar_read()/tar_load(), so a direct
+# render can use stale or missing data if the pipeline hasn't been run.
 title: "Manuscript Title"
 author:
   - name: "Your Name"
@@ -23,27 +23,25 @@ Write your introduction here, citing sources as needed [@example2024].
 
 library(targets)
 library(here)
-here::i_am("manuscript/index.qmd")
+here::i_am("manuscript/manuscript.qmd")
+source(here("R/functions.R"))
 ```
 
 ```{r}
 #| label: get-render-environment
 #| include: false
 
-library(jsonlite)
-
-info_file <- Sys.getenv("QUARTO_EXECUTE_INFO")
-info <- fromJSON(info_file)
-
-# Access document path
-info$`document-path`
-
-# Access format information
-render_format <- info$format$identifier$`target-format`
-
-is_html <- identical(render_format, "html")
-is_typst <- identical(render_format, "typst")
-is_docx <- identical(render_format, "docx")
+# detect_render_format() (R/functions.R) always returns real, non-NULL
+# values for every field - see that function's roxygen comment for why a
+# hand-rolled version of this lookup previously broke with
+# "object 'is_html' not found" whenever QUARTO_EXECUTE_INFO was unset
+# (tarchetypes' dependency-scanning pass, or a standalone/interactive knit).
+fmt <- detect_render_format()
+is_html <- fmt$is_html
+is_typst <- fmt$is_typst
+is_docx <- fmt$is_docx
+is_interactive <- fmt$is_interactive
+ext <- fmt$ext
 ```
 
 # Methods
@@ -98,15 +96,7 @@ Because notebooks, etc. are provided via the sidebar, they don't show up in HTML
 si_files <- list.files(here("manuscript/supplementary"), pattern = "\\.qmd$")
 si_files <- sort(setdiff(si_files, "notebook-template.qmd"))
 
-# TODO: Doesn't work when we run in an int. session as knitr option returns null. worth fixing?
-ext <- switch(
-  knitr::opts_knit$get("rmarkdown.pandoc.to"),
-  docx = "docx",
-  typst = "pdf",
-  NA_character_
-)
-
-if (!is.na(ext)) {
+if (!is_interactive && !is_html) {
   for (f in si_files) {
     title <- rmarkdown::yaml_front_matter(here(
       "manuscript/supplementary",
@@ -116,8 +106,6 @@ if (!is.na(ext)) {
     cat(sprintf("- [%s](supplementary/%s.%s)\n", title, base, ext))
   }
 }
-
-# TODO: This works, but the formatting's messy and at least in Word they don't look like links
 ```
 
 :::

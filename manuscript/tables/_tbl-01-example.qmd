@@ -8,11 +8,22 @@
      call - confirmed by direct testing that without it, the object prints
      as a dumped internal structure instead of an actual table, since the
      package that owns the print method isn't guaranteed loaded in this
-     render session just because it built the object upstream. -->
+     render session just because it built the object upstream.
+
+     flextable_use_format_font() (R/functions.R) overrides flextable's
+     own Arial default to match whatever font each output format actually
+     uses for its own body text - see that function's roxygen comment for
+     why this has to happen here (print time) rather than in
+     tbl-01-example.R (build time). -->
 
 ```{r}
 #| label: tbl-01-example
 #| tbl-cap: "Example table generated from the pipeline."
 library(flextable)
-targets::tar_read(tbl_01_example, store = here::here("_targets"))
+# R/functions.R isn't auto-sourced into Quarto's own render session (that's
+# tar_source()'s job, and it only runs inside the targets pipeline's R
+# session) - same reasoning as the library(flextable) call above.
+source(here::here("R/functions.R"))
+targets::tar_read(tbl_01_example, store = here::here("_targets")) |>
+  flextable_use_format_font()
 ```

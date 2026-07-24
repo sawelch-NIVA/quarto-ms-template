@@ -1,6 +1,6 @@
 ---
 # ! Render this project via `targets::tar_make()` (the `render_site` target
-# ! in _targets.R), not `quarto render` on this file directly — see index.qmd.
+# ! in _targets.R), not `quarto render` on this file directly — see manuscript.qmd.
 #
 # Files under supplementary/ are rendered as part of the site automatically
 # (Quarto renders every .qmd in the project by default), but they are NOT
@@ -21,8 +21,8 @@ title: "Supplementary Notebook Title"
 # Purpose
 
 Describe what this notebook explores and how it relates to the main
-manuscript ([index.qmd](../index.qmd)). Depending on the needs of the 
-project, the layout of a notebook may be a miniature version of the main manuscript (Introduction, Methods, Results, etc.) or something less formulaic. 
+manuscript ([manuscript.qmd](../manuscript.qmd)). Depending on the needs of the
+project, the layout of a notebook may be a miniature version of the main manuscript (Introduction, Methods, Results, etc.) or something less formulaic.
 
 ```{r}
 #| label: setup
@@ -38,15 +38,19 @@ library(here)
 i_am("manuscript/supplementary/notebook-template.qmd")
 ```
 
+{{< include _back-to-manuscript.qmd >}}
+
 By default code chunk output to the console is rendered as is (straight onto a white background in HTML, although it gets a grey background in Word and PDF). It looks pretty bad. You also can't reference it.
 
 ```{r}
 #| label: explore
-# store= is required here, not optional: manuscript/_quarto.yml's
-# execute-dir: project means R code runs with cwd = manuscript/ (the
-# nested Quarto project's own root), but the _targets/ store itself lives
-# at the repo root next to _targets.R - tar_read()'s default store lookup
-# is cwd-relative, not here()-anchored, so it wouldn't find it otherwise.
+# store= is required here, not optional: tar_read()'s default store
+# lookup is cwd-relative, not here()-anchored, and cwd during chunk
+# execution isn't reliable across every render path (confirmed: it's
+# manuscript/ under a direct `quarto render`, but the repo root under
+# this project's actual tarchetypes::tar_quarto() render - see CLAUDE.md).
+# here("_targets") works either way since here() resolves via upward
+# sentinel search, not cwd.
 data <- tar_read(simulate_data, store = here("_targets"))
 head(data)
 ```

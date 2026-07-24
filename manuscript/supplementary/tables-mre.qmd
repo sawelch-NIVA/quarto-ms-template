@@ -1,6 +1,6 @@
 ---
 # Render this project via `targets::tar_make()` (the `render_site` target in
-# _targets.R), not `quarto render` on this file directly — see index.qmd.
+# _targets.R), not `quarto render` on this file directly — see manuscript.qmd.
 #
 # This is a minimal reproducible example (MRE) for comparing R's main
 # table packages side by side across HTML, docx, and typst (PDF) output.
@@ -15,6 +15,8 @@ params:
   is_typst: FALSE
   is_docx: FALSE
 ---
+
+{{< include _back-to-manuscript.qmd >}}
 
 ```{r}
 #| label: setup

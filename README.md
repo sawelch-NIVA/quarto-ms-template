@@ -48,7 +48,7 @@ manuscript/          →  a self-contained Quarto project, one level below the
                          typst), theme, bibliography/CSL, default figure
                          size & DPI. output-dir stays inside manuscript/ —
                          see the warning below, not a style choice
-  ├─ index.qmd        →  the manuscript itself
+  ├─ manuscript.qmd   →  the manuscript itself
   ├─ tables/          →  one build file (tbl-NN-slug.R) + include partial
                          (_tbl-NN-slug.qmd) per table — see below
   ├─ figures/         →  same pattern as tables/, one pair of files per
@@ -77,15 +77,16 @@ keep rendered output at the repo root — Quarto accepts that YAML without
 complaint but doesn't actually support it: it warned about an unexpected
 path configuration and, in practice, scattered one render's output across
 three different locations at once instead of writing cleanly to one. That
-was the root cause of a recurring typst "file not found" error and a
-`.docx` that Word flagged as needing repair (traced to the table specifically
-— removing it stopped the prompt). Moving output-dir back inside
-`manuscript/` fixed both. See CLAUDE.md for the full diagnosis.
+was the root cause of a recurring typst "file not found" error. Moving
+output-dir back inside `manuscript/` fixed it. See CLAUDE.md for the full
+diagnosis. (A separate docx "Word found unreadable content" bug was once
+misattributed to this same fix — it wasn't; see "Known Issues" below for
+the real cause and fix.)
 
 Each table/figure has its own **build file** (`tables/tbl-01-example.R`,
 defining a `build_*()` function with its own package loads and styling
 code) and its own thin **include partial**
-(`tables/_tbl-01-example.qmd`, pulled into `index.qmd` via
+(`tables/_tbl-01-example.qmd`, pulled into `manuscript.qmd` via
 `{{< include >}}`) — adding a new table/figure means adding a new pair of
 files, not editing a shared list. `_targets.R` wires each build file in as
 its own target, and `submission/` gets the same built object exported as
@@ -97,7 +98,7 @@ explicit `store = here::here("_targets")` since the `_targets/` store
 lives one level up from the manuscript project's own root).
 
 **Always render through `targets::tar_make()`, not `quarto render`
-directly.** `manuscript/index.qmd` (and any notebook that calls
+directly.** `manuscript/manuscript.qmd` (and any notebook that calls
 `tar_read()`/`tar_load()`) depends on the `_targets/` data store;
 rendering it standalone can pick up stale or missing data. Every `.qmd` in
 this repo has a comment at the top of its YAML front matter as a
@@ -169,9 +170,10 @@ HTML, docx, and typst. Headline findings:
 
 Pandoc/Quarto write Word output by re-using named styles from this
 file — anything it doesn't define, Word silently substitutes a
-generic default for. As shipped, `manuscript/styles/db-space-line-n.docx` covers
-headings, title/subtitle, quotes, and line numbering, but is missing
-several styles pandoc actively references, most importantly:
+generic default for, with no error or warning either at render time or
+when you open the file. As shipped, `manuscript/styles/db-space-line-n.docx`
+covered headings, title/subtitle, quotes, and line numbering, but was
+missing several styles pandoc actively references, most importantly:
 
 - **`Table`** — the style applied to every rendered table. Missing it
   is very likely why tables look inconsistent/plain in Word.
@@ -181,13 +183,39 @@ several styles pandoc actively references, most importantly:
   paragraph and blockquote styling.
 - **`Author`, `Date`, `Abstract`, `Abstract Title`** — title-page
   metadata.
-- Also absent: `Hyperlink`, `TOC Heading`, footnote styles, `Verbatim
-  Char` (inline code).
+- Also absent: `TOC Heading`, footnote styles.
 
-Fix: open the docx in Word and define new styles with these exact
-names (Word's *Styles* pane → *New Style*), formatted however your
-target journal wants. You don't need to import anything — pandoc just
-needs a style with the matching name to exist.
+**Now fixed in both `db-space-line-n.docx` and `standard.docx`, confirmed
+by direct testing (not just added and assumed correct):**
+
+- **`Hyperlink`** — pandoc tags every hyperlink run (external links *and*
+  crossreferences like `Figure 1`/`Table 1`/citation links) with
+  `<w:rStyle w:val="Hyperlink"/>`, unconditionally. Neither reference doc
+  actually defined that style (Word only knew the name as a "latent"/
+  reserved style it could offer, never one with real formatting behind
+  it), so every hyperlink rendered as plain, unstyled text. Fixed by
+  adding a real character style (`#0563C1`, single underline — Word's own
+  built-in default for this exact style name).
+- **`Verbatim Char`** (inline code, e.g. `` `read_csv()` `` in prose) and
+  **`Source Code`** (fenced code blocks) — same "referenced but never
+  defined" gap. Without `Verbatim Char` defined, inline/block code wasn't
+  even monospace, just plain body text. Fixed: `Verbatim Char` now sets a
+  monospace font (`Fira Code`, matching the project's html `monofont`);
+  `Source Code` adds a light grey shaded box around fenced code blocks.
+  Pandoc's syntax-highlighting token styles (`KeywordTok`, `StringTok`,
+  ...) all chain their formatting from `Verbatim Char` via `basedOn`, so
+  defining it once covers both plain and syntax-highlighted code.
+
+Fix for anything still missing: open the docx in Word and define a new
+style with the exact name pandoc references (Word's *Styles* pane → *New
+Style*). You don't need to import anything — pandoc just needs a style
+with the matching name to exist. To find out what name pandoc used for a
+given construct without guessing, convert a minimal example and inspect
+`word/document.xml`/`word/styles.xml` directly (unzip the docx) — see
+[rendering-pipeline.qmd](manuscript/supplementary/rendering-pipeline.qmd)'s
+"general recipe" section for the full procedure, and "Known Issues" below
+for one place this same mechanism turned out **not** to be fixable this
+way (callout header/body splitting).
 
 ## Citations
 
@@ -239,6 +267,9 @@ Caused by error:
 And this when run via `quarto render`
 
 ```
+# verbatim transcript from when the manuscript file was still named
+# index.qmd (since renamed to manuscript.qmd) - filenames below reflect
+# that at the time, not the current layout
 PS C:\Users\SAW\Local Documents\quarto-ms-template\manuscript> quarto render
 [1/4] index.qmd
 [typst]: Compiling index.typ to index.pdf...error: file not found (searched at \\?\C:\Users\SAW\Local Documents\quarto-ms-template\manuscript\index_files\figure-typst\tbl-01-example-1.png)
@@ -268,6 +299,66 @@ re-rendering — a half-written scratch folder from an earlier failed or
 interrupted render is itself enough to cause the next render to fail with
 a confusing "file not found" error, independent of what caused the
 original failure.
+
+### `.docx` "Word found unreadable content" on tables
+
+Any docx table whose caption is crossreferenced (`@tbl-foo` anywhere in
+the manuscript) makes Word show its "found unreadable content, click here
+to attempt recovery" prompt — but only when the caption renders *above*
+the table, which is docx's own default. This is an
+[upstream, still-open Quarto bug](https://github.com/quarto-dev/quarto-cli/issues/7321),
+not something specific to this template, and it's confirmed to affect
+`flextable` output (the table package this project uses throughout, see
+"R table packages" below). It was previously misdiagnosed here as fully
+fixed by the `output-dir` fix above — that fix was real and did resolve a
+genuine relationship-corruption bug, but this is a separate issue that
+came back later on unrelated renders.
+
+**Fix:** `manuscript/_quarto.yml` sets `tbl-cap-location: bottom` under
+`format.docx`, moving every docx table caption below its table — confirmed
+working by testing directly in Word. It's docx-only (html/typst are
+unaffected and still caption tables on top) and document-wide within docx
+— there's no way to keep top-captions for tables that aren't
+crossreferenced while fixing only the ones that are. If a "Word found
+unreadable content" prompt reappears on a table-heavy docx render despite
+this setting, check whether a new table format/package regressed the
+underlying upstream bug rather than assuming it's the `output-dir` issue
+again — they look similar but have different fixes.
+
+### `.docx` callout header can separate from its body across a page break
+
+Callouts (`::: {.callout-note}` etc.) render in docx as a 2-row Word table
+— row 1 is the icon+title header, row 2 is the body — built by Quarto's
+own bundled docx callout filter (not something in this project). Each row
+gets `<w:cantSplit/>`, which only stops *that row's own* content splitting
+mid-row; it does nothing to keep row 1 attached to row 2. If the header
+row fits at the bottom of a page but the body row doesn't, Word leaves the
+header behind and starts the body on the next page — worse with wide line
+spacing, since less content fits per page before the break.
+
+**Investigated, not cleanly fixable at the project level.** OOXML has no
+table-level "keep these rows together" property; the standard technique
+(add `<w:keepNext/>` to the header row's paragraph, which Word does honour
+across a table row boundary) would need to be injected into the callout's
+generated XML, but Quarto represents a callout as one of its own internal
+"custom AST node" types until *Quarto's own* filter chain resolves it to
+the final docx table — confirmed by instrumenting a project Lua filter
+with debug output: at the default filter position it saw only the
+callout's unresolved title/body sub-content, and neither of Quarto's
+documented later filter-chain positions (`post-ast`, `post-quarto`) ever
+invoked the filter's AST callback at all in this Quarto version, so there
+was no reliable point at which to intercept the fully-resolved table and
+patch it. A working fix likely needs either an upstream Quarto change, or
+a post-processing step that edits the rendered `.docx`'s
+`word/document.xml` directly after `tar_quarto()` finishes (not attempted
+here — would need to be wired into `_targets.R` as a target that always
+reruns alongside `render_manuscript`, and re-verified after any Quarto
+upgrade since it'd depend on Quarto's current callout table XML shape).
+
+**Workaround for now:** if a specific callout splits awkwardly in a real
+render, open it in Word, click into the header row's title text, and
+apply Paragraph → *Keep with next* by hand. Manual and per-document, but
+reliable.
 
 ### Stale `PATH` / multiple R or Quarto installations
 

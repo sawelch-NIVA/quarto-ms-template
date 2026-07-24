@@ -28,12 +28,19 @@ project:
   # where things belong. Output now lands in manuscript/output/, not
   # output/ at the repo root - see CLAUDE.md/README.md's "Directory layout".
   output-dir: output
-  # Execute every .qmd's code with working directory = this project's own
-  # root (manuscript/), not the file's own folder (Quarto's default).
-  # Note this means tar_read()/tar_load() calls in index.qmd/supplementary/
+  # Execute every .qmd's code with a working directory meant to be this
+  # project's own root (manuscript/), not the file's own folder (Quarto's
+  # default) - confirmed by direct testing this only actually holds for a
+  # plain `quarto render`; this project's real render path
+  # (tarchetypes::tar_quarto(), the render_manuscript target in
+  # _targets.R) has cwd = the REPO ROOT instead, not manuscript/ - see
+  # CLAUDE.md's "Consequence of nesting manuscript/..." section. Don't
+  # trust cwd for any file path in manuscript/**/*.qmd regardless of this
+  # setting; use here::here(...) (anchored via here::i_am()) instead.
+  # E.g. tar_read()/tar_load() calls in manuscript.qmd/supplementary/
   # *.qmd/tables/figures partials can't find _targets/ via a plain
-  # tar_read(x) - that store lives at the repo root, one level up from
-  # here, not inside manuscript/. Pass store = here::here("_targets")
+  # tar_read(x) - that store lives at the repo root, not inside
+  # manuscript/ either way. Pass store = here::here("_targets")
   # explicitly to every tar_read()/tar_load() call instead of relying on
   # cwd - confirmed by direct testing this is genuinely required, not
   # just defensive.
@@ -48,12 +55,15 @@ website:
     contents:
         - section: "Article"
           contents:
-            - href: index.qmd
+            - href: manuscript.qmd
               text: "Main File"
         - section: "Notebooks" # Notebooks with programmatic logic
           contents:
             - href: supplementary\notebook-template.qmd
               text: "Notebook Template"
+              icon: journal-code
+            - href: supplementary\rendering-pipeline.qmd
+              text: "How Rendering Works: knitr, Pandoc, Typst"
               icon: journal-code
             - href: supplementary\images-mre.qmd
               text: "Rendering Images in Quarto"
@@ -83,9 +93,10 @@ format:
 
 
   docx:
-    # reference-doc: styles/standard.docx         # bog standard word formatting
-    reference-doc: styles/db-space-line-n.docx    # for revisions
-    toc: true # probably don't want this for the final version of anything
+    reference-doc: styles/standard.docx         # bog standard word formatting
+    # reference-doc: styles/db-space-line-n.docx    # for revisions
+    toc: false # true adds a link warning on opening
+    tbl-cap-location: bottom # fixes a bug with docx corruption (see readme)
   typst:
     number-sections: true
 

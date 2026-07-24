@@ -1,0 +1,261 @@
+---
+# ! Render this project via `targets::tar_make()` (the `render_manuscript`
+# ! target in _targets.R), not `quarto render` on this file directly — see
+# ! manuscript.qmd.
+title: "How a .qmd becomes html/docx/pdf: the compute → filter → convert pipeline"
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(here)
+here::i_am("manuscript/supplementary/rendering-pipeline.qmd")
+```
+
+{{< include _back-to-manuscript.qmd >}}
+
+::: {.callout-tip}
+# The Short Version
+- One `.qmd` is executed **once** by knitr, producing a single intermediate
+  markdown document with computed output already substituted in — R only
+  runs once per render, not once per output format.
+- That intermediate markdown then goes through Quarto's Lua filters
+  (cross-reference numbering, this project's `flextable-qmd` filter), and
+  only *then* to pandoc, which has a separate writer per output format.
+- docx and typst are not "pandoc understands Word/PDF directly" — docx is
+  pandoc writing OOXML text with **named style references**, and typst is
+  pandoc writing Typst *markup*, which Quarto's bundled typst compiler then
+  compiles to PDF as a distinct final step.
+- The docx path is the one with a sharp edge: pandoc tags text with a style
+  *name* (`Hyperlink`, `Table`, `Strong`, ...) and leaves the actual
+  formatting up to whatever `reference-doc` defines for that name. A name
+  Word lists as available but never actually defines (a "latent" style)
+  silently renders as plain text — no error, no warning. This is exactly
+  what was wrong with hyperlinks in this template until it was fixed
+  alongside this notebook — see the worked example below.
+:::
+
+# Why this notebook exists
+
+Everything else under `supplementary/` is a minimal reproducible example —
+render this content, look at the file, report what actually happened
+([tables-mre.qmd](tables-mre.qmd), [images-mre.qmd](images-mre.qmd)). This
+notebook is a bit different: it exists to explain a piece of *mechanism*
+that's easy to work around without ever understanding, right up until it
+breaks in a way that only makes sense once you know how the pieces fit
+together. It also plays double duty as the writeup for a real bug found
+and fixed while writing it (the docx hyperlink styling issue), since that
+bug is a direct, concrete illustration of the mechanism.
+
+# The pipeline, in one diagram
+
+```{mermaid}
+%%| label: fig-pipeline-overview
+%%| fig-cap: "One .qmd, one knitr execution, many pandoc writers"
+flowchart TD
+    A[".qmd source<br/>prose + R code chunks"] --> B["knitr executes R chunks<br/>(cached by execute: freeze)"]
+    B --> C["intermediate markdown<br/>chunk output already substituted in"]
+    C --> D["Quarto Lua filters walk the AST<br/>e.g. crossref numbering,<br/>this project's flextable-qmd filter"]
+    D --> E{"pandoc — one writer<br/>per target format"}
+    E -->|html writer| F["manuscript.html"]
+    E -->|docx writer| G["OOXML docx<br/>styled via reference-doc"]
+    E -->|typst writer| H["manuscript.typ<br/>(Typst markup, not a PDF yet)"]
+    H --> I["Quarto's bundled typst compiler"]
+    I --> J["manuscript.pdf"]
+```
+
+Four stages, each confirmed by direct testing in this project rather than
+assumed from documentation:
+
+## 1. Compute — knitr runs once, not once per format
+
+For an R-engine `.qmd` (the default in this `website`-type project — see
+[CLAUDE.md](../../CLAUDE.md)'s "Core architectural decision"), knitr
+executes every code chunk and produces **one** intermediate markdown
+document with computed output already inlined — figures rendered to image
+files and referenced, table objects printed, inline R expressions
+evaluated. This happens once per `.qmd`, before pandoc sees anything, and
+before Quarto even knows it needs to hand off to three different writers.
+
+This is also exactly what `execute: freeze` controls
+(`manuscript/_quarto.yml`): it's a cache over *this* stage specifically —
+skip re-running knitr and reuse the last intermediate markdown. It has
+nothing to do with pandoc or the output formats downstream, which is why
+`freeze: true` can serve stale *content* indefinitely (a real regression
+hit earlier in this project, see CLAUDE.md's "Related, separate gotcha")
+while having zero effect on, say, a docx styling problem — that lives
+entirely in stage 3, described below.
+
+## 2. Filter — Lua filters walk the pandoc AST before conversion
+
+Before any format-specific writer runs, Quarto passes the document through
+Lua filters that operate on pandoc's internal document representation (its
+abstract syntax tree, not text). Two examples already active in this
+project's `manuscript/_quarto.yml`:
+
+- Quarto's own crossref filter, which turns `@fig-example` / `@tbl-example`
+  / `@eq-poisson` into numbered, format-appropriate links (`Figure 1`,
+  `Table 1`, ...) — confirmed below to matter for the hyperlink styling
+  bug, since crossrefs render as real hyperlinks in docx, not just plain
+  text with a number.
+- This project's own `filters: [flextable-qmd]` line, which is what makes
+  the flextable-based tables in [tables-mre.qmd](tables-mre.qmd) work
+  identically across formats.
+
+## 3. Convert — pandoc, one writer per format, docx via named styles
+
+This is the stage where html, docx, and typst genuinely diverge, and where
+they diverge *differently* than you'd guess:
+
+- **html**: pandoc writes HTML tags directly (`<a>`, `<table>`, ...) and
+  the browser's own default styling (plus `styles/styles.css`) does the
+  rest. A hyperlink is blue and underlined here for free — that's just
+  what browsers do with `<a>` tags with no extra work from pandoc or this
+  project.
+- **docx**: pandoc does **not** hand-craft formatting into the OOXML runs
+  it writes. Instead it tags spans of text with a **style reference** —
+  `<w:rStyle w:val="Hyperlink"/>` for link text, similarly for `Strong`,
+  `Table`, and others already documented in CLAUDE.md — and leaves the
+  actual color/weight/border/etc. to be looked up from whatever
+  `reference-doc` supplies for a style with that exact name. This is the
+  same relationship as an HTML `class="..."` attribute and an external
+  CSS file: the tag alone renders nothing.
+- **typst**: pandoc writes **Typst markup** (`manuscript.typ`) — a distinct
+  intermediate artifact, confirmed directly by watching a render log:
+  `[typst]: Compiling manuscript.typ to manuscript.pdf...DONE`. This is pandoc's
+  typst *writer*, functionally the same kind of thing as its docx or html
+  writer, just targeting a different output language.
+
+## 4. Compile — only typst has this extra step
+
+html and docx are pandoc's actual final output — nothing further happens
+to them. typst is different: pandoc's output (`manuscript.typ`) is source code
+in the Typst language, and Quarto's bundled Typst compiler (no separate
+system install needed — confirmed in CLAUDE.md) compiles *that* into
+`manuscript.pdf`. A typst-stage failure is therefore a compile error in
+generated Typst markup, not a pandoc conversion error — which is also why
+one bad image format can hard-fail typst specifically while html/docx
+sail through unaffected (documented in [images-mre.qmd](images-mre.qmd)'s
+TIFF section): the failure is happening one stage later than it is for
+the other two formats.
+
+# Worked example: the docx hyperlink styling gap
+
+This project had a real instance of the stage-3 failure mode described
+above: hyperlinks rendered as working links in the docx output (clicking
+them navigated correctly) but displayed as plain black, non-underlined
+text — nothing visually marked them as links, unlike html where this is
+automatic.
+
+## Confirming the mechanism, not guessing at it
+
+Generating a one-line test document and inspecting the raw OOXML pandoc
+produced showed exactly what stage 3 above predicts:
+
+```xml
+<w:hyperlink r:id="rId20">
+  <w:r>
+    <w:rPr><w:rStyle w:val="Hyperlink" /></w:rPr>
+    <w:t xml:space="preserve">link to example</w:t>
+  </w:r>
+</w:hyperlink>
+```
+
+Pandoc *is* tagging the run with `w:rStyle val="Hyperlink"` unconditionally
+— this part was never the problem. Checking both `styles/db-space-line-n.docx`
+and `styles/standard.docx` (this project's two reference docs) for an
+actual definition of that style turned up nothing:
+
+```xml
+<!-- word/styles.xml in both reference docs had: -->
+<w:lsdException w:name="Hyperlink" w:semiHidden="1" w:unhideWhenUsed="1"/>
+<!--
+  i.e. Word knows "Hyperlink" as a style NAME it could show in the
+  style gallery, but no <w:style w:styleId="Hyperlink"> block anywhere
+  actually defines what it looks like.
+-->
+```
+
+That `<w:lsdException>` entry is a **latent style declaration** — Word's
+way of saying "this name is reserved/known, offer it in the UI if asked,"
+which is a different thing from a style *definition*
+(`<w:style w:type="character" w:styleId="Hyperlink">...<w:rPr>...`). Pandoc
+references the name; nothing in either reference doc backed it with actual
+formatting. This is the identical failure shape CLAUDE.md already documents
+for the `Table` style — "missing style falls back to a generic default,
+Word does not warn you" — just discovered independently for `Hyperlink`.
+
+## The fix
+
+A character style definition was added to both reference docs, based on
+Word's own built-in default for this exact style name:
+
+```xml
+<w:style w:type="character" w:styleId="Hyperlink">
+  <w:name w:val="Hyperlink"/>
+  <w:basedOn w:val="DefaultParagraphFont"/>
+  <w:uiPriority w:val="99"/>
+  <w:unhideWhenUsed/>
+  <w:rPr>
+    <w:color w:val="0563C1"/>
+    <w:u w:val="single"/>
+  </w:rPr>
+</w:style>
+```
+
+Confirmed end-to-end, not just at the level of the reference doc in
+isolation: a full `targets::tar_make()` rebuild of this project, followed
+by extracting `manuscript/output/manuscript.docx`'s own `word/document.xml` and
+`word/styles.xml` directly, showed **six** hyperlink runs in the real
+manuscript — cross-references to an equation, a section, a figure, and a
+table, plus a citation link — all tagged `w:rStyle val="Hyperlink"`, and
+the now-present style definition sitting in the output docx's own
+`styles.xml`. Every one of those was previously unstyled in Word, not just
+plain external URLs; Quarto's crossref filter (stage 2 above) renders
+cross-references as real docx hyperlinks, so the bug silently affected
+in-document navigation too, not only links to outside URLs.
+
+```{mermaid}
+%%| label: fig-hyperlink-sequence
+%%| fig-cap: "Why an undefined style renders silently instead of erroring"
+sequenceDiagram
+    participant MD as intermediate markdown/AST
+    participant PW as pandoc docx writer
+    participant RD as reference-doc styles.xml
+    participant W as Word
+
+    MD->>PW: "[link text](url)" / a crossref
+    PW->>PW: wrap the run in w:rStyle val="Hyperlink"
+    PW->>RD: look up styleId="Hyperlink"
+    alt style actually defined
+        RD-->>PW: color + underline copied into output docx
+        PW->>W: styled blue, underlined text
+    else style only latent (name known, never defined)
+        RD-->>PW: nothing to copy - no error raised
+        PW->>W: falls back to Normal - no color, no warning
+    end
+```
+
+## The general recipe this generalizes to
+
+Any "it renders, but looks wrong specifically in Word, specifically not in
+html" symptom is worth checking against this same mechanism before
+suspecting anything more exotic:
+
+1. Generate a minimal doc containing the construct in question and convert
+   it with pandoc directly (bypassing Quarto/targets, just to isolate the
+   stage), then extract `word/document.xml` and look for the `w:rStyle` /
+   `w:pStyle` name pandoc chose.
+2. Check whether that exact style name is *defined* (has real `<w:rPr>` /
+   `<w:pPr>` content), not just *listed*, in whichever `reference-doc` is
+   configured in `manuscript/_quarto.yml`.
+3. If it's missing or only latent, add a real `<w:style>` block for that
+   name — matching Word's own built-in default is usually the least
+   surprising choice, as done above for `Hyperlink`.
+
+CLAUDE.md's "The Word reference doc" section lists the other style names
+pandoc is already confirmed to reference this way (`Table`,
+`TableCaption`, `BodyText`, `Compact`, ...) — the same check is worth
+running against any of those if a new formatting gap turns up.
+
+# References

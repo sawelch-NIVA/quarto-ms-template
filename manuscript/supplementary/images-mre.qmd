@@ -1,6 +1,6 @@
 ---
 # Render this project via `targets::tar_make()` (the `render_site` target in
-# _targets.R), not `quarto render` on this file directly — see index.qmd.
+# _targets.R), not `quarto render` on this file directly — see manuscript.qmd.
 #
 # This is a minimal reproducible example (MRE) for images and diagrams in
 # Quarto: mermaid diagrams, auto-generated (ggplot2) figures, and images
@@ -21,6 +21,8 @@ here::i_am("manuscript/supplementary/images-mre.qmd")
 
 set.seed(1)
 ```
+
+{{< include _back-to-manuscript.qmd >}}
 
 ::: {.callout-tip}
 # The Short Version

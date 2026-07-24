@@ -5,7 +5,7 @@
 # then build the analysis pipeline and render the manuscript.
 #
 # This script does NOT scaffold a new Quarto project — the project files
-# (index.qmd, _quarto.yml, etc.) are already part of this template and are
+# (manuscript.qmd, _quarto.yml, etc.) are already part of this template and are
 # version-controlled. Re-running quarto::quarto_create_project() here would
 # overwrite your customised YAML/content, so don't.
 
@@ -44,7 +44,7 @@ if (length(missing_pkgs) > 0) {
 
 # 2. Ensure folder structure exists ----
 # R/                    - custom functions, sourced by _targets.R via tar_source()
-# manuscript/           - self-contained Quarto project: index.qmd, its own
+# manuscript/           - self-contained Quarto project: manuscript.qmd, its own
 #                         _quarto.yml, tables/, figures/, supplementary/,
 #                         styles/, img/, references.bib (all tracked in git)
 #                         — see "Directory layout" in CLAUDE.md/README.md
@@ -87,7 +87,7 @@ for (d in required_dirs) {
 quarto::quarto_version()
 
 # 4. Run the targets pipeline ----
-# Builds all data/model/figure targets AND renders index.qmd, since a
+# Builds all data/model/figure targets AND renders manuscript.qmd, since a
 # tar_quarto() target is wired into _targets.R.
 targets::tar_make()
 

@@ -24,7 +24,7 @@ tar_option_set(
 tar_source()
 # manuscript/tables/ and manuscript/figures/ hold one .R file per
 # table/figure (the build_*() function) plus a matching _*.qmd include
-# partial (see manuscript/index.qmd) - keeps each table/figure's
+# partial (see manuscript/manuscript.qmd) - keeps each table/figure's
 # construction code and package loads out of this file and out of every
 # other target's hands. tar_source() only picks up *.R, so it ignores the
 # .qmd partials living alongside them.
@@ -93,7 +93,7 @@ list(
     ),
     format = "file"
   ),
-  # # Renders the whole Quarto project rooted at manuscript/ (index.qmd,
+  # # Renders the whole Quarto project rooted at manuscript/ (manuscript.qmd,
   # supplementary/*.qmd, ...) - a self-contained Quarto sub-project, see
   # manuscript/_quarto.yml. tarchetypes scans each .qmd for tar_read()/
   # tar_load() calls and wires up the matching target dependencies
