@@ -184,10 +184,18 @@ geographic lat/lon.
 Three packages cover this project's actual needs without touching a
 manually-downloaded shapefile:
 
-- **`rnaturalearth`** (+ `rnaturalearthdata`/`rnaturalearthhires`) -
-  general-purpose country/state boundaries at three scales
-  (`"small"`/`"medium"`/`"large"`), `sf` directly via `ne_countries()`/
-  `ne_states()`.
+- **`rnaturalearth`** (+ `rnaturalearthdata`) - general-purpose country/
+  state boundaries at three scales (`"small"`/`"medium"`/`"large"`),
+  `sf` directly via `ne_countries()`/`ne_states()`. Every example in
+  this notebook uses `scale = "medium"` (`rnaturalearthdata`, on CRAN) -
+  `scale = "large"` needs the companion `rnaturalearthhires` package
+  too, which is **not** on CRAN (confirmed by a real CI failure: it's
+  ~76MB of high-res shapefiles, kept off CRAN and distributed via
+  ropensci's r-universe instead) and so isn't in this project's
+  `R/required_packages.R` - install it separately
+  (`install.packages("rnaturalearthhires", repos =
+  "https://ropensci.r-universe.dev")`) only if a future edit actually
+  needs `scale = "large"`.
 - **`giscoR`** - Eurostat/GISCO's own boundaries, and **the best source
   specifically for Europe** because it gives NUTS-level regions
   natively, at the actual resolution Eurostat itself publishes.
