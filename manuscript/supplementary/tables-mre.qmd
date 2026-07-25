@@ -16,8 +16,6 @@ params:
   is_docx: FALSE
 ---
 
-{{< include _back-to-manuscript.qmd >}}
-
 ```{r}
 #| label: setup
 #| include: false
@@ -27,6 +25,15 @@ library(gt)
 library(flextable)
 library(huxtable)
 library(DT)
+library(here)
+# Missing here() anchor, confirmed a real gap (not defensive styling) by
+# testing a direct `quarto render` rather than tar_quarto(): this
+# notebook's {{< include _back-to-manuscript.qmd >}} needs here() already
+# anchored, and here()'s upward-search fallback alone isn't reliable
+# across every cwd this project renders under - see CLAUDE.md's
+# "Consequence of nesting manuscript/..." section. Every other notebook
+# in this project already does this; this one was the one exception.
+here::i_am("manuscript/supplementary/tables-mre.qmd")
 
 set.seed(1)
 dat <- data.frame(
@@ -93,6 +100,8 @@ huge <- data.frame(
   Score = round(rnorm(250, 50, 10), 1)
 )
 ```
+
+{{< include _back-to-manuscript.qmd >}}
 
 Quarto render env is:
 

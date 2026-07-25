@@ -23,7 +23,31 @@ stale or missing data. Every `.qmd` has a YAML-comment reminder of this.
 `_targets.R` has one `tar_quarto(name = render_manuscript, path = "manuscript")`
 target that renders the whole `manuscript/` project (all formats) as the
 pipeline's last step — confirmed this single target produces
-html+docx+typst together, no per-format targets needed.
+html+docx+typst together, no per-format targets needed. **Actively
+confirmed NOT to be splittable into separate per-format targets while
+sharing today's single `output-dir`**: `tar_quarto()` does support
+scoping a render to one format (`quarto_args = c("--to", "html")`, wraps
+`quarto render --to <format>`), but a scoped render still runs Quarto's
+website-render cleanup pass over the *whole* `output-dir` — confirmed by
+direct testing that a `--to html`-only render deleted the already-present
+`manuscript.docx` and `manuscript.pdf` from `manuscript/output/`, not
+just left them untouched. This is the same cleanup behavior already
+documented above (deletes anything under `output-dir` it doesn't
+recognize as its own) — newly confirmed here that "its own" is scoped to
+the *current* `--to` format, not every format declared in `_quarto.yml`,
+so a sibling format's legitimate prior output counts as unrecognized and
+gets removed. Three separate targets this way wouldn't coexist — each
+would delete the previous one's output, leaving only whichever ran last.
+A working version would need three separate `output-dir`s (via
+`--output-dir`, a real per-invocation override) plus a merge step before
+deployment, and would break the cross-format "download as Word/PDF"
+links and the single-directory GitHub Pages deploy this project's
+current layout depends on — a real, substantial restructuring, not a
+small tweak, for a benefit (isolating one format's failure from the
+other two, e.g. the TIFF/PDF findings above) that's already been mostly
+addressed by not putting typst-incompatible content in figures in the
+first place. Revisit only if that content discipline turns out not to be
+enough in practice.
 
 ## Conventions
 
@@ -218,6 +242,25 @@ interactive testing — use `here::here(...)` (anchored via that file's own
 `here::i_am()`, called before the path is needed) for every file path, as
 CLAUDE.md already prescribes elsewhere, now confirmed for a second,
 independent reason beyond the `tar_read()`/`tar_load()` case above.**
+
+**A third, independent confirmed instance, found while testing whether
+`render_manuscript` could be split into per-format targets (see below):**
+`manuscript/supplementary/tables-mre.qmd` had `{{< include
+_back-to-manuscript.qmd >}}` placed *before* its own setup chunk's
+`here::i_am()` call, and never called `here::i_am()` at all (relied
+entirely on `here()`'s upward-search fallback) — `manuscript/appendices/
+appendix-a-example.qmd` had no setup chunk or `here::i_am()` at all,
+having been deliberately written "near-empty." Both rendered fine under
+every `tar_quarto()`-driven render in this project's history (cwd = repo
+root always trivially satisfies upward search regardless of a missing or
+late anchor) and both hard-errored the moment a direct `quarto render`
+was tried instead, with `source(here::here("R/functions.R"))` inside
+`_back-to-manuscript.qmd` unable to open the connection. Fixed in both
+files. **Every `.qmd` that includes `_back-to-manuscript.qmd` needs its
+own `here::i_am()` call in a setup chunk that runs *before* that
+include — including a document with no other R content of its own** —
+this was silently true for every notebook except these two, and nothing
+short of testing a non-`tar_quarto()` render path surfaced it.
 
 ## Confirmed by direct testing, not assumed
 

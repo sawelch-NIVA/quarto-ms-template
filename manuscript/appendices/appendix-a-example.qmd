@@ -13,6 +13,19 @@
 title: "Appendix A: Example"
 ---
 
+```{r}
+#| label: setup
+#| include: false
+# Needed even though this appendix has no R content of its own -
+# _back-to-manuscript.qmd's include below has a hidden chunk that calls
+# here::here("R/functions.R"), and here() needs *this* document's own
+# i_am() call to anchor correctly - confirmed by direct testing: this
+# renders fine under tar_quarto() (cwd = repo root there always masks a
+# missing anchor) but fails under a direct `quarto render` from inside
+# manuscript/ without it. Every notebook needs this, "no R code" or not.
+here::i_am("manuscript/appendices/appendix-a-example.qmd")
+```
+
 {{< include ../supplementary/_back-to-manuscript.qmd >}}
 
 This is a placeholder appendix — static content with no R code, for
