@@ -2,16 +2,15 @@
 # Render via `targets::tar_make()` (the `render_manuscript` target in
 # _targets.R), not `quarto render` directly - see manuscript.qmd.
 #
-# Minimal reproducible example (MRE) for diagram-drawing tools in Quarto,
-# beyond the mermaid coverage already in images-mre.qmd: Graphviz/DOT (the
-# knitr `dot` engine and DiagrammeR::grViz), cetz (typst-native drawing,
-# reached via a raw `{=typst}` block), and grammar-of-graphics network
-# diagrams in R (ggraph). Render all three formats and open them next to
-# each other.
+# Minimal reproducible example (MRE) for diagram-drawing tools: Mermaid
+# (zero-install flowcharts/sequence diagrams), Graphviz/DOT (the knitr
+# `dot` engine and DiagrammeR::grViz), cetz (typst-native drawing, reached
+# via a raw `{=typst}` block), and grammar-of-graphics network diagrams in
+# R (ggraph). Render all three formats and open them next to each other.
 #
 # To surface this notebook in the site navigation, see the comment in
 # supplementary/notebook-template.qmd.
-title: "Diagrams in Quarto: Graphviz, cetz, and ggraph"
+title: "Diagrams: Mermaid, Graphviz, cetz, and ggraph"
 ---
 
 ```{r}
@@ -33,8 +32,11 @@ set.seed(1)
 
 ::: {.callout-tip}
 # The Short Version
-- **Mermaid** already covers the "zero-install flowchart" case — see
-  [images-mre.qmd](images-mre.qmd), not repeated here.
+- **Mermaid** works natively across html/docx/typst with zero extra
+  install — Quarto converts it to a static PNG for docx/typst on its own,
+  confirmed with no system Node/Deno/mermaid-cli on `PATH`. That PNG is a
+  raster, not an editable diagram — "just fix it in Word" means editing a
+  picture.
 - **Graphviz's `dot` engine** shells out to a system `dot` binary — and it
   actually worked here, but only found via whatever environment the real
   `tar_quarto()` render process resolves, not the shell used to sanity-check
@@ -52,19 +54,56 @@ set.seed(1)
   mean) for trusting it.
 - **ggraph** (tidygraph + ggplot2) produces an ordinary ggplot object, so
   it inherits this project's existing ggplot findings
-  ([images-mre.qmd](images-mre.qmd), [plots-mre.qmd](plots-mre.qmd))
-  rather than being a new format-support question.
+  ([plots-mre.qmd](plots-mre.qmd)) rather than being a new format-support
+  question.
 :::
 
 # Why this notebook exists
 
 Flowcharts and network diagrams show up constantly in manuscripts, and
-"just use Mermaid" (see [images-mre.qmd](images-mre.qmd)) doesn't cover
-every case — hand-drawn technical diagrams (Graphviz/DOT), typst-native
-vector drawing (cetz), and actual data-driven network graphs (ggraph) are
-different tools for different jobs. Findings below are from direct
-testing in this template against `--to html`, `--to docx`, and
-`--to typst`, not assumed from each tool's own documentation.
+"just use Mermaid" doesn't cover every case — hand-drawn technical
+diagrams (Graphviz/DOT), typst-native vector drawing (cetz), and actual
+data-driven network graphs (ggraph) are different tools for different
+jobs. Findings below are from direct testing in this template against
+`--to html`, `--to docx`, and `--to typst`, not assumed from each tool's
+own documentation.
+
+# Mermaid
+
+Quarto renders ```` ```{mermaid} ```` code blocks natively in HTML via
+mermaid.js. The interesting question is docx/typst, since those aren't
+JS-capable targets — confirmed here: Quarto converts the diagram to a
+static PNG automatically, with **no system Node/Deno/mermaid-cli install
+required** (this environment has none of those on `PATH`, and the
+diagrams still rendered correctly in all three formats).
+
+```{mermaid}
+%%| label: fig-mermaid-flowchart
+%%| fig-cap: "A simple pipeline flowchart"
+flowchart LR
+  A[Raw data] --> B[Processing]
+  B --> C[Manuscript]
+```
+
+```{mermaid}
+%%| label: fig-mermaid-sequence
+%%| fig-cap: "A sequence diagram"
+sequenceDiagram
+  participant R as R/targets
+  participant Q as Quarto
+  participant P as Pandoc
+  R->>Q: tar_quarto() renders the project
+  Q->>P: hands off each format
+  P-->>Q: html / docx / typst
+  Q-->>R: rendered site in output/
+```
+
+- ✅ Works out of the box in html/docx/typst — no Lua filter, no
+  extension, no system dependency needed to render *something*.
+- The docx/typst versions are a **raster PNG**, not an editable diagram —
+  a collaborator tweaking wording in the Word version by hand is editing
+  a picture, not text. Worth knowing before relying on "just fix it in
+  Word" as a fallback plan.
 
 # Graphviz / DOT
 
@@ -206,8 +245,8 @@ everything else — layers, aesthetics, a `+`-composed spec — rather than a
 separate DSL like DOT or Mermaid. Because the output is an ordinary
 `ggplot` object, it should inherit this project's existing ggplot
 findings (device, fonts, sizing — see
-[images-mre.qmd](images-mre.qmd)/[plots-mre.qmd](plots-mre.qmd)) rather
-than raising new format-support questions of its own.
+[plots-mre.qmd](plots-mre.qmd)) rather than raising new format-support
+questions of its own.
 
 ```{r}
 #| label: fig-ggraph

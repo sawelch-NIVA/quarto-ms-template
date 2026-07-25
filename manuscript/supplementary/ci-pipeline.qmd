@@ -179,7 +179,7 @@ The workflow's own cleanup log named the culprit: orphaned `chrome`,
 `chrome_crashpad_handler`, and `deno` processes, terminated only because
 the job was cancelled. `render_manuscript` is the one step that renders
 `manuscript/`'s mermaid diagrams
-([images-mre.qmd](images-mre.qmd), [rendering-pipeline.qmd](rendering-pipeline.qmd))
+([diagrams-mre.qmd](diagrams-mre.qmd), [rendering-pipeline.qmd](rendering-pipeline.qmd))
 to PNG for docx/typst, and Quarto does that via a Deno-managed headless
 Chrome - confirmed real (not a guess) by running
 `quarto install chrome-headless-shell` directly in this session: it's a

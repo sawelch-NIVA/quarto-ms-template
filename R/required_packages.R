@@ -18,6 +18,8 @@ required_pkgs <- c(
   "tibble", # used by the example target — swap/extend as needed
   "here", # anchors file paths to the project root everywhere
   "jsonlite", # used by detect_render_format() (R/functions.R)
+  "rlang", # used by geom_sf_shadowtext() (R/functions.R)
+  "cli", # used by geom_sf_shadowtext() (R/functions.R)
   # Used by supplementary/tables-mre.qmd - drop if you delete that notebook.
   "kableExtra",
   "gt",
@@ -65,6 +67,32 @@ required_pkgs <- c(
   "scico",
   "MetBrewer",
   "paletteer",
+  # Used by supplementary/maps-mre.qmd - drop if you delete that notebook.
+  # sf + ggplot2's geom_sf() draw the maps; rnaturalearth(data/hires) and
+  # giscoR/eurostat supply boundaries as sf objects directly (no manual
+  # shapefile download); ggspatial adds north-arrow/scale-bar annotations
+  # geom_sf() has no native equivalent for; terra/tidyterra handle raster
+  # layers (e.g. bathymetry) alongside sf vector layers; classInt supplies
+  # proper choropleth breaks (Jenks/quantile) instead of raw continuous
+  # scales; shadowtext is used via geom_sf_shadowtext() (R/functions.R) for
+  # legible labels over complex map backgrounds. mregions2 and marmap are
+  # marine-specific: IHO Sea Areas/EEZ boundaries and NOAA bathymetry
+  # grids respectively - neither has a general-purpose land-map
+  # equivalent, both are this project's actual domain (marine work).
+  "sf",
+  "rnaturalearth",
+  "rnaturalearthdata",
+  "rnaturalearthhires",
+  "giscoR",
+  "eurostat",
+  "ggspatial",
+  "terra",
+  "tidyterra",
+  "classInt",
+  "shadowtext",
+  "ggrepel",
+  "mregions2",
+  "marmap",
   # Used by tests/testthat/ - see manuscript/supplementary/testing-mre.qmd.
   "testthat",
   "withr"

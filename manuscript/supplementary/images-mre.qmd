@@ -2,14 +2,17 @@
 # Render via `targets::tar_make()` (the `render_manuscript` target in
 # _targets.R), not `quarto render` directly - see manuscript.qmd.
 #
-# Minimal reproducible example (MRE) for images and diagrams in Quarto:
-# mermaid diagrams, auto-generated (ggplot2) figures, and images created
-# elsewhere and loaded from a file, across HTML, docx, and typst (PDF)
-# output. Render all three formats and open them next to each other.
+# Minimal reproducible example (MRE) for image FILE FORMATS specifically
+# - PNG, JPEG, SVG, PDF, TIFF, created elsewhere and loaded from a file
+# (not generated inline by an R chunk - see plots-mre.qmd for that, and
+# diagrams-mre.qmd for Mermaid/Graphviz/cetz/ggraph, both split out of
+# this notebook once it grew past "file formats"). Across HTML, docx, and
+# typst (PDF) output - render all three formats and open them next to
+# each other.
 #
 # To surface this notebook in the site navigation, see the comment in
 # supplementary/notebook-template.qmd.
-title: "Images & diagrams in Quarto: mermaid, ggplot, and files"
+title: "Image formats: PNG, JPEG, SVG, PDF, TIFF"
 ---
 
 ```{r}
@@ -26,12 +29,17 @@ set.seed(1)
 
 ::: {.callout-tip}
 # The Short Version
-- Mermaid diagrams work natively across html/docx/typst with zero extra
-  install — Quarto converts them to PNG for docx/typst on its own
 - PNG and JPEG are the safe defaults — they work everywhere with no warnings
 - SVG is native (vector) in html and typst, but needs `rsvg-convert` on
   PATH for docx — without it, pandoc warns and the docx image has no raster
   fallback
+- **Which SVG device wrote the file matters, not just "it's SVG"**:
+  `svglite` (used throughout this project) writes real `<text>`
+  elements; base R's `svg()` (Cairo) converts every character to a
+  vector-outline glyph referenced via `<use xlink:href="#glyph-N">` —
+  a pattern with documented Firefox-specific rendering fragility that
+  `svglite`'s approach never exercises. Already the safer choice here;
+  see the SVG section for why it matters.
 - **A referenced PDF figure fails quietly, the opposite of TIFF**: typst
   embeds it correctly as real vector content, but html renders it as a
   blank box (confirmed in an actual browser, not just the markup — this
@@ -51,105 +59,19 @@ set.seed(1)
 
 # Why this notebook exists
 
-Figures and diagrams have the same problem tables do
-([tables-mre.qmd](tables-mre.qmd)): what works on screen doesn't
-automatically work identically across html, docx, and typst. Findings
-below are from direct testing in this template — commands were run
-against `--to html`, `--to docx`, and `--to typst`, and outputs inspected
-(extracted docx media, `pdftotext`, rendered PDF pages), not assumed from
-documentation.
+Images have the same problem tables do ([tables-mre.qmd](tables-mre.qmd)):
+what works on screen doesn't automatically work identically across html,
+docx, and typst. Findings below are from direct testing in this template
+— commands were run against `--to html`, `--to docx`, and `--to typst`,
+and outputs inspected (extracted docx media, `pdftotext`, rendered PDF
+pages), not assumed from documentation.
 
-# Mermaid diagrams
-
-Quarto renders ```` ```{mermaid} ```` code blocks natively in HTML via
-mermaid.js. The interesting question is docx/typst, since those aren't
-JS-capable targets — confirmed here: Quarto converts the diagram to a
-static PNG automatically, with **no system Node/Deno/mermaid-cli install
-required** (this environment has none of those on `PATH`, and the
-diagrams still rendered correctly in all three formats).
-
-```{mermaid}
-%%| label: fig-mermaid-flowchart
-%%| fig-cap: "A simple pipeline flowchart"
-flowchart LR
-  A[Raw data] --> B[Processing]
-  B --> C[Manuscript]
-```
-
-```{mermaid}
-%%| label: fig-mermaid-sequence
-%%| fig-cap: "A sequence diagram"
-sequenceDiagram
-  participant R as R/targets
-  participant Q as Quarto
-  participant P as Pandoc
-  R->>Q: tar_quarto() renders the project
-  Q->>P: hands off each format
-  P-->>Q: html / docx / typst
-  Q-->>R: rendered site in output/
-```
-
-- ✅ Works out of the box in html/docx/typst — no Lua filter, no
-  extension, no system dependency needed to render *something*.
-- The docx/typst versions are a **raster PNG**, not an editable diagram —
-  a collaborator tweaking wording in the Word version by hand is editing
-  a picture, not text. Worth knowing before relying on "just fix it in
-  Word" as a fallback plan.
-
-# Auto-generated figures: ggplot2
-
-Ordinary knitr-managed figures pick up the global `fig-width`/`fig-height`/
-`fig-dpi` settings in `_quarto.yml` (currently 6in × 4in × 300dpi, with html
-getting knitr's `fig.retina = 2` default on top — see the README/CLAUDE.md
-for that finding). That global sizing is a fine default for a single plot,
-but breaks down fast for a faceted plot with many panels.
-
-```{r}
-#| label: fig-simple
-#| fig-cap: "A single plot at the default global fig dimensions"
-d <- data.frame(x = rnorm(100), y = rnorm(100))
-ggplot(d, aes(x, y)) +
-  geom_point() +
-  theme_bw()
-```
-
-## Facets at the default size
-
-```{r}
-#| label: fig-facet-default
-#| fig-cap: "9 facets, default 6x4 global fig dimensions — legibility suffers"
-d2 <- data.frame(
-  x = rnorm(900),
-  y = rnorm(900),
-  g1 = sample(letters[1:3], 900, replace = TRUE),
-  g2 = sample(LETTERS[1:3], 900, replace = TRUE)
-)
-p <- ggplot(d2, aes(x, y)) +
-  geom_point(size = 0.5, alpha = 0.4) +
-  facet_grid(g1 ~ g2) +
-  theme_bw(base_size = 11)
-p
-```
-
-## The same facets, sized for the content instead of the default
-
-Per-chunk `fig-width`/`fig-height` override the document-wide default, and
-a smaller `base_size` keeps facet-strip and axis text from dominating the
-panel:
-
-```{r}
-#| label: fig-facet-fixed
-#| fig-cap: "Same 9 facets, wider/taller + smaller base font"
-#| fig-width: 8
-#| fig-height: 6
-p + theme_bw(base_size = 9)
-```
-
-**Takeaway:** don't leave a multi-facet plot at the document-wide default
-"because that's what everything else uses" — check it renders legibly and
-override `fig-width`/`fig-height` (and font size) per chunk when it doesn't.
-
-# Images created elsewhere, loaded from a file
+This notebook covers image *file formats* specifically — a diagram/photo/
+scan created elsewhere and loaded from a file, not generated inline by an
+R chunk. For diagram-drawing tools (Mermaid, Graphviz, cetz, ggraph), see
+[diagrams-mre.qmd](diagrams-mre.qmd); for ggplot2 figure sizing/theming,
+see [plots-mre.qmd](plots-mre.qmd) — this notebook used to cover all
+three before it grew past "file formats."
 
 Not every figure comes from an R chunk — diagrams from Illustrator/
 Inkscape/PowerPoint, scans, micrographs, and photos all arrive as files to
@@ -172,7 +94,7 @@ double-relative path and a "file not found" error when tested; plain
 relative markdown paths are the right tool for a static file reference
 like this one.
 
-## PNG and JPEG — the safe defaults
+# PNG and JPEG — the safe defaults
 
 ![PNG](../figures/sample-photo.png){#fig-png width="50%"}
 
@@ -183,7 +105,7 @@ like this one.
   weren't visually obvious next to the PNG — don't assume that holds at
   lower quality or with sharper line art.
 
-## SVG — native vector in html/typst, needs a system dependency for docx
+# SVG — native vector in html/typst, needs a system dependency for docx
 
 ![SVG (vector diagram, drawn with svglite)](../figures/sample-diagram.svg){#fig-svg width="50%"}
 
@@ -205,7 +127,69 @@ like this one.
   bet: convert vector diagrams meant for docx to PNG ahead of time, or
   install `rsvg-convert` and re-check in actual Word.
 
-## PDF — the opposite failure shape from TIFF: nothing errors, two formats silently misbehave
+## Which R device writes the SVG matters — not just "SVG vs other formats"
+
+The fixture above is deliberately drawn with `svglite::svglite()`
+(`generate-images.R`), not base R's own `svg()` device — worth checking
+whether that choice actually matters, rather than treating "SVG" as one
+interchangeable thing.
+
+It does. The same content via base R's `svg()` (Cairo-backed on this
+machine, confirmed via `capabilities("cairo")`) produces structurally
+different markup: `svglite` writes real `<text>` elements referencing a
+font **by name** (`style='font-family: "Arial";'`), while `svg()`
+converts every character to a vector outline path, defines each unique
+glyph once in `<defs>`, and places each character with `<use
+xlink:href="#glyph-0-N">` — confirmed by generating both from identical
+`grid` content and diffing the output directly, not assumed from either
+package's docs.
+
+Both parse as well-formed XML and both rendered correctly here (checked
+directly: loaded each as a standalone top-level SVG document — no
+`document.body`, `document.documentElement.tagName` is `"svg"`, exactly
+how a browser handles a `.svg` opened directly rather than embedded —
+and confirmed real text/glyph content present, not a parse failure).
+**But `<use xlink:href="#glyph-N">` self-referencing glyph output is a
+specifically documented area of Firefox fragility that svglite's plain
+`<text>` approach never exercises at all** — Mozilla bugzilla has
+several open/historical reports of exactly this pattern
+([1778298](https://bugzilla.mozilla.org/show_bug.cgi?id=1778298),
+[316959](https://bugzilla.mozilla.org/show_bug.cgi?id=316959)),
+including one specifically about a Content-Security-Policy interaction
+([1303364](https://bugzilla.mozilla.org/show_bug.cgi?id=1303364)) — the
+kind of thing that could plausibly read as "a security issue" in
+hindsight. **Not independently reproduced in actual Firefox here** (this
+environment's browser-testing tool is Chromium/Electron-based, the same
+engine family Positron's own plot viewer runs on — which would neatly
+explain "works in Positron, not in Firefox" as a Chromium-vs-Gecko
+difference rather than anything wrong with the file itself) — flagged as
+well-sourced, not confirmed first-hand, same epistemic bar as the
+`rsvg-convert` caveat above.
+
+**Practical upshot**: this project already uses `svglite` exclusively
+(`generate-images.R`, every ggplot figure via the `ragg_png` knitr
+device for raster output) — the safer choice was already made, this
+just documents *why* it matters, rather than being a fix that's needed.
+If a future contributor reaches for a different SVG-producing
+device/package, check whether it emits real `<text>` (portable) or
+glyph-outline `<use>` references (Chromium-safe, Firefox-risky) before
+assuming "it's SVG, it'll be fine everywhere."
+
+**On SVG metadata**, the other half of the question: `svglite`'s output
+here carries no more than what's needed to draw the shapes — an XML
+declaration, the `svg`/`xlink` namespace declarations SVG requires, one
+`<style>` block (CSS rules for stroke/fill defaults, scoped to a
+`.svglite` class so it can't leak into a host page if inlined), a
+`<clipPath>` sized to the canvas, and the drawn shapes/text themselves.
+**No embedded font files, no external resource references, no
+scripts** — a font is referenced purely by *name* (confirmed in
+[fonts-mre.qmd](fonts-mre.qmd)'s own finding that `svglite` doesn't
+embed the font it registers, only its name), so nothing here reaches
+outside the file at render time. Worth knowing precisely what's *not*
+there, not just what is, when a "security issue" is the working theory
+for a rendering bug.
+
+# PDF — the opposite failure shape from TIFF: nothing errors, two formats silently misbehave
 
 A `ggsave(..., device = "pdf")`/`cairo_pdf()` figure is a real, common
 case journals ask for directly (vector, more universally accepted than
@@ -271,7 +255,7 @@ referenced from `manuscript.qmd` itself. Typst is the one format where
 embedding it directly would actually work cleanly — not worth relying on
 alone, since it fails differently (not loudly) in the other two.
 
-## TIFF — hard-errors typst, and takes html/docx down with it
+# TIFF — hard-errors typst, and takes html/docx down with it
 
 ::: {.content-visible unless-format="typst"}
 ![TIFF](../figures/sample-scan.tiff){#fig-tiff width="50%"}
@@ -317,7 +301,7 @@ Nothing about TIFF (bit depth, compression) survives being converted at
 that point that html/docx/typst can actually use anyway.
 :::
 
-## Legibility at real size
+# Legibility at real size
 
 The fine-print labels baked into the fixture images (`figures/*` — 4 lines,
 decreasing size) are the point of that "busy" content: at 100% they read
@@ -327,7 +311,7 @@ rendered page directly. A figure legible in the source file or at full
 screen width isn't evidence it'll stay legible shrunk to a page column —
 check the rendered output at the size it'll actually appear.
 
-## A note on file size
+# A note on file size
 
 The same synthetic content, uncompressed, came to **~24MB as TIFF** versus
 ~850KB as PNG and ~350KB as JPEG — regenerating `figures/sample-scan.tiff`

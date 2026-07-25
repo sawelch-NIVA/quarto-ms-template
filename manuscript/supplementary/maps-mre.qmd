@@ -1,0 +1,610 @@
+---
+# Render via `targets::tar_make()` (the `render_manuscript` target in
+# _targets.R), not `quarto render` directly - see manuscript.qmd.
+#
+# Maps: sf + ggplot2::geom_sf() as the drawing layer, R-package-native
+# boundary/statistical sources (rnaturalearth, giscoR, eurostat) instead
+# of hand-downloaded shapefiles, curated city-point sources (rnaturalearth
+# populated_places, giscoR Urban Audit) so "where are the cities" doesn't
+# turn into an ad hoc geocoding project, projections with a Europe focus
+# (EPSG:3035), choropleth styling with classInt breaks, geom_sf_shadowtext()
+# for labels over complex backgrounds, insets (patchwork vs cowplot), and
+# marine-specific data (mregions2's IHO Sea Areas/EEZ, marmap bathymetry) -
+# this project's actual domain (NIVA, marine/water science).
+title: "Maps: sf, geodata sources, projections, and marine layers"
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(sf)
+library(ggplot2)
+library(rnaturalearth)
+library(giscoR)
+library(eurostat)
+library(ggspatial)
+library(terra)
+library(tidyterra)
+library(classInt)
+library(shadowtext)
+library(patchwork)
+library(cowplot)
+library(mregions2)
+library(marmap)
+library(here)
+here::i_am("manuscript/supplementary/maps-mre.qmd")
+
+source(here("R/functions.R"))
+set_default_palettes()
+```
+
+{{< include _back-to-manuscript.qmd >}}
+
+::: {.callout-tip}
+# The Short Version
+- **`sf` + `ggplot2::geom_sf()` remains the right default for drawing** -
+  it composes with everything else this template already does
+  (`theme_set()`, `patchwork`, the viridis/scico defaults from
+  [colour-mre.qmd](colour-mre.qmd), `ragg_png`). `ggspatial` adds the one
+  thing `geom_sf()` has no native equivalent for: a scale bar and north
+  arrow.
+- **`rnaturalearth`, `giscoR`, and `eurostat` hand back `sf` objects
+  directly** - no manual shapefile download for any of the boundaries
+  used in this notebook. `giscoR` is the standout for **Europe**
+  specifically: it's Eurostat/GISCO's own NUTS boundaries.
+- **"Where are the cities" has an R-native answer, not just a future
+  geonorge lookup**: `rnaturalearth::ne_download(type =
+  "populated_places")` is a curated global `POINT` dataset that ships
+  its own `POP_MAX`/`SCALERANK`/`LABELRANK` fields - confirmed these
+  exist specifically to answer "which cities are prominent enough to
+  draw at this extent," not just a name/lat/lon dump. `giscoR::
+  gisco_get_urban_audit()` is the Europe-specific complement, curated by
+  Eurostat's own Urban Audit statistical programme membership rather
+  than a population threshold.
+- **Reproject before adding a `ggspatial` scale bar - confirmed this
+  isn't cosmetic.** An un-projected (WGS84 lat/lon) map of Norway
+  triggered a real warning, `Scale on map varies by more than 10%, scale
+  bar may be inaccurate` - confirmed it disappears once the same data is
+  `st_transform()`'d to **EPSG:3035 (ETRS89-LAEA Europe)** first, this
+  notebook's recommended default CRS for any European-extent figure.
+- **`classInt::classIntervals()` breaks (Jenks/quantile) + this
+  project's existing viridis/scico defaults is the right choropleth
+  combo** - same "raw continuous undersells structure" finding
+  [colour-mre.qmd](colour-mre.qmd) already made for a non-spatial
+  heatmap, confirmed again here for polygon fills.
+- **`geom_sf_shadowtext()`** (`R/functions.R`, ported from
+  [GuangchuangYu/shadowtext](https://github.com/GuangchuangYu/shadowtext)
+  for `sf` geometries) - confirmed working for labelling polygons/points
+  where a plain `geom_sf_text()` label would disappear into a
+  multi-coloured background.
+- **`patchwork::inset_element()` and `cowplot::draw_plot()` produced
+  visually identical insets, confirmed side by side** - `cowplot` is not
+  required just to inset one map inside another. Two real gotchas found
+  while confirming that: `theme_void()` strips `panel.background`
+  entirely, so an inset is genuinely transparent (not just borderless)
+  unless given an explicit opaque fill; and loading both packages in one
+  session masks `patchwork::align_plots()` with `cowplot`'s own version.
+- **`mregions2` is the R-native access point for the IHO's own
+  boundaries** (via Flanders Marine Institute/marineregions.org, who
+  maintain the canonical digital version) - confirmed fetching IHO Sea
+  Areas and EEZ layers directly as `sf`. Confirmed concretely that they
+  are genuinely different shapes, not interchangeable: Norway's EEZ and
+  the IHO's "Norwegian Sea" polygon don't align, because one is a legal/
+  economic boundary and the other a 1953 cartographic convention.
+- **`marmap` + `terra`/`tidyterra` pulls real NOAA/GEBCO bathymetry into
+  the same `sf`/`ggplot2` pipeline** - confirmed with a live fetch. Watch
+  `tidyterra`'s `_bathy`-suffixed hypsometric palettes specifically: they
+  assume every cell is a negative depth, so land cells in the same
+  raster render blank, not an obviously-wrong colour.
+:::
+
+# Why this notebook exists
+
+This project's manuscripts and figures already lean on `ggplot2`
+throughout - maps are not a different tool so much as a different
+geometry (`geom_sf()`) and a different category of data source
+(boundaries and geodata, not a data frame typed in by hand). This
+notebook confirms, by actually fetching real boundaries and rendering
+real figures, which R-package-native sources cover this project's actual
+needs (Europe generally, marine/water science specifically), what
+projection to default to, and two things easy to get wrong the first
+time: legible labels over a complex polygon fill, and insetting a
+territory that's geographically far from its parent map (Svalbard, for
+Norway).
+
+# Drawing: `sf` + `geom_sf()`, and what `ggspatial` adds
+
+`ggplot2::geom_sf()` draws any `sf` object directly - no coordinate
+un-nesting, no `fortify()` - and `coord_sf()` handles reprojection at
+draw time.
+
+```{r}
+#| label: fig-basic-sf
+#| fig-cap: "Europe, drawn with plain geom_sf() - no extra packages needed to get this far"
+#| fig-width: 7
+#| fig-height: 6
+europe <- ne_countries(continent = "europe", scale = "medium", returnclass = "sf")
+
+ggplot(europe) +
+  geom_sf(fill = "grey85", colour = "grey40") +
+  coord_sf(xlim = c(-15, 40), ylim = c(34, 72)) +
+  theme_minimal() +
+  labs(title = "Europe (rnaturalearth, medium scale)")
+```
+
+`geom_sf()` has no built-in scale bar or north arrow - `ggspatial`
+supplies both as ordinary layers. Norway is a good stress test for this:
+it spans about 13 degrees of latitude, and a `ggspatial` scale bar
+computed on that extent while still in geographic (WGS84) coordinates
+produces a real, confirmed warning:
+
+```{r}
+#| label: fig-ggspatial-unprojected
+#| fig-cap: "ggspatial scale bar on an un-projected map - a real warning, not hypothetical"
+#| fig-width: 6
+#| fig-height: 7
+norway_4326 <- ne_countries(country = "Norway", scale = "medium", returnclass = "sf")
+
+ggplot(norway_4326) +
+  geom_sf(fill = "grey85") +
+  annotation_scale(location = "bl", width_hint = 0.3) +
+  theme_minimal() +
+  labs(title = "Norway, left in WGS84 - scale bar warning below")
+```
+
+```{r}
+#| label: fig-ggspatial-projected
+#| fig-cap: "Same map, reprojected to EPSG:3035 first - warning gone, scale bar now accurate"
+#| fig-width: 6
+#| fig-height: 7
+norway <- st_transform(norway_4326, 3035)
+
+ggplot(norway) +
+  geom_sf(fill = "grey85") +
+  annotation_scale(location = "bl", width_hint = 0.3) +
+  annotation_north_arrow(
+    location = "tr",
+    which_north = "true",
+    style = north_arrow_fancy_orienteering()
+  ) +
+  theme_minimal() +
+  labs(title = "Norway, projected to EPSG:3035, with scale bar + north arrow")
+```
+
+The first chunk prints `Scale on map varies by more than 10%, scale bar
+may be inaccurate` - confirmed this is specific to the un-projected CRS,
+not to `ggspatial` or this particular map in general: the second chunk,
+identical except for the `st_transform(norway_4326, 3035)` reprojection,
+produces no warning at all. `annotation_scale()` only produces an
+accurate scale bar once the map is on a projected CRS, not left in
+geographic lat/lon.
+
+# Boundary and geodata sources, all as R packages
+
+Three packages cover this project's actual needs without touching a
+manually-downloaded shapefile:
+
+- **`rnaturalearth`** (+ `rnaturalearthdata`/`rnaturalearthhires`) -
+  general-purpose country/state boundaries at three scales
+  (`"small"`/`"medium"`/`"large"`), `sf` directly via `ne_countries()`/
+  `ne_states()`.
+- **`giscoR`** - Eurostat/GISCO's own boundaries, and **the best source
+  specifically for Europe** because it gives NUTS-level regions
+  natively, at the actual resolution Eurostat itself publishes.
+- **`eurostat`** - pairs with `giscoR`: pulls the statistical data to
+  join onto those same NUTS geometries.
+
+```{r}
+#| label: fig-gisco-nuts
+#| fig-cap: "NUTS2 regions for Norway, via giscoR - includes Svalbard og Jan Mayen"
+#| fig-width: 7
+#| fig-height: 6
+nuts2_no <- gisco_get_nuts(nuts_level = 2, country = "Norway", resolution = "10")
+
+ggplot(nuts2_no) +
+  geom_sf(aes(fill = NUTS_NAME)) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(title = "Norway's NUTS2 regions (giscoR)")
+```
+
+`giscoR` returned **seven** NUTS2 regions for Norway, not six - the
+seventh is `Svalbard og Jan Mayen`, geographically ~800km north of the
+mainland. That single fact is what motivates the inset section below:
+any bounding box that includes Svalbard forces the mainland into a
+small fraction of the plot area.
+
+# Cities: point data, not boundaries
+
+Boundaries answer "where does a region start and stop" - a different
+question from "where are the cities," which is a point-location problem
+with its own curation issue: a full gazetteer has hundreds of thousands
+of named places, and drawing all of them is never the right answer. The
+real question is which subset earns a dot and a label at a given map
+extent - the same problem [colour-mre.qmd](colour-mre.qmd) framed for
+colour ("not every figure needs a full categorical palette") shows up
+here as "not every settlement needs a marker."
+
+`rnaturalearth::ne_download(type = "populated_places")` is the
+R-native, general-purpose answer - a curated global point dataset (not
+a raw gazetteer dump) that ships exactly the fields needed to make that
+call:
+
+```{r}
+#| label: fig-cities
+#| fig-cap: "Norwegian cities filtered by population, via rnaturalearth's populated_places"
+#| fig-width: 6
+#| fig-height: 7
+places <- ne_download(
+  scale = "medium",
+  type = "populated_places",
+  category = "cultural",
+  returnclass = "sf"
+)
+norway_cities <- places[places$ADM0NAME == "Norway" & places$POP_MAX > 20000, ]
+
+ggplot() +
+  geom_sf(data = norway_4326, fill = "grey90") +
+  geom_sf(data = norway_cities, colour = "firebrick", size = 1.8) +
+  geom_sf_shadowtext(
+    data = norway_cities,
+    aes(label = NAME),
+    bg.colour = "white",
+    colour = "black",
+    size = 3.5,
+    fontface = "bold",
+    nudge_x = 1.1,
+    hjust = 0
+  ) +
+  coord_sf(xlim = c(4, 34), ylim = c(57, 71.5)) +
+  theme_minimal() +
+  labs(title = "Norwegian cities with population > 20,000")
+```
+
+The filter above (`POP_MAX > 20000`) is a plain threshold on a field the
+dataset already provides - no separate geocoding step, no manual "which
+cities matter" list. `SCALERANK`/`LABELRANK` (also included) serve the
+same purpose from the cartographic side: lower ranks are the
+places Natural Earth itself judges prominent enough to keep at a small
+map scale, useful if population isn't the criterion that matters for a
+given figure (administrative capitals, say, via the `ADM0CAP`/`ADM1CAP`
+flags also present).
+
+**`giscoR::gisco_get_urban_audit()`** is the Europe-specific complement,
+returning `sf` points (`spatialtype = "LB"`) for exactly the cities
+Eurostat's own Urban Audit programme profiles - a different kind of
+curation from `POP_MAX` (statistical-programme membership, not a
+population threshold), but ties into the same `giscoR` calls this
+notebook already uses for NUTS boundaries:
+
+```{r}
+#| label: gisco-urban-audit
+ua_cities <- gisco_get_urban_audit(country = "Norway", spatialtype = "LB", level = "CITIES")
+sf::st_drop_geometry(ua_cities)[, c("URAU_NAME", "CITY_CPTL")]
+```
+
+Only **4** Norwegian cities are in Eurostat's Urban Audit programme
+(Oslo, Bergen, Trondheim, Stavanger) against **5** in
+`populated_places` above at the `POP_MAX > 20000` threshold (it also
+includes Tromsø) - confirms these are two genuinely different curation
+criteria, not two sources converging on the same list, so which one to
+reach for depends on whether the figure's actual point is population
+size or EU/EFTA statistical-programme membership.
+
+For an exhaustive (uncurated) list of settlements rather than a
+prominence-filtered one - every town down to a few hundred people, not
+just the ones worth a map label - base R's own `maps::world.cities` data
+frame is a lighter-weight fallback (`name`/`country.etc`/`pop`/`lat`/
+`long`/`capital` columns, `st_as_sf(coords = c("long", "lat"))` away
+from an `sf` point layer), at the cost of losing the scale-rank
+filtering fields that make `populated_places` the better default for
+"which cities belong on this map."
+
+# Projections, with a focus on Europe
+
+Boundaries from all three sources above arrive in **EPSG:4326** (WGS84
+lat/lon) - fine for storage, not for area comparison or accurate
+distance/scale measurement at European latitudes. **ETRS89-LAEA Europe
+(EPSG:3035)** is this notebook's recommended default: it's the
+equal-area projection Eurostat itself uses for its own European
+thematic maps, and `giscoR`/`eurostat` data lines up with it naturally.
+
+```{r}
+#| label: fig-projection-compare
+#| fig-cap: "Same NUTS2 data, WGS84 (left) vs EPSG:3035 (right)"
+#| fig-width: 9
+#| fig-height: 5
+nuts2_nordic <- gisco_get_nuts(
+  nuts_level = 2,
+  country = c("Norway", "Sweden", "Finland"),
+  resolution = "20"
+)
+nuts2_nordic <- nuts2_nordic[!grepl("Svalbard", nuts2_nordic$NUTS_NAME), ]
+
+p_4326 <- ggplot(nuts2_nordic) +
+  geom_sf(fill = "grey85") +
+  theme_minimal() +
+  labs(title = "EPSG:4326 (as supplied)")
+
+p_3035 <- ggplot(st_transform(nuts2_nordic, 3035)) +
+  geom_sf(fill = "grey85") +
+  theme_minimal() +
+  labs(title = "EPSG:3035 (ETRS89-LAEA Europe)")
+
+p_4326 | p_3035
+```
+
+The shape difference is subtle at this extent but real - it compounds at
+full-Europe extent, and it's what an accurate scale bar depends on (see
+`fig-ggspatial` above): `st_transform(x, 3035)` before any figure that
+needs to compare area or report distance, not just before adding a
+`ggspatial` layer specifically.
+
+**Reserve Web Mercator (EPSG:3857) for compositing with slippy-map
+tiles** (`maptiles`, `ggspatial::annotation_map_tile()`) - it's not
+appropriate for an area-comparison choropleth, since it distorts area
+increasingly with latitude (dramatically so by the time it reaches
+Scandinavia).
+
+# Styling: `classInt` breaks + this project's existing palette defaults
+
+[colour-mre.qmd](colour-mre.qmd) found that a raw continuous fill scale
+undersells structure that a properly-binned scale reveals - the same
+finding holds for a choropleth. `classInt::classIntervals()` computes
+real breaks (Jenks natural-breaks, quantile, etc.) instead of leaving
+`cut()` to guess even intervals.
+
+```{r}
+#| label: fig-choropleth
+#| fig-cap: "NUTS2 choropleth: classInt Jenks breaks + this project's viridis default"
+#| fig-width: 7
+#| fig-height: 7
+set.seed(42)
+nuts2_3035 <- st_transform(nuts2_nordic, 3035)
+nuts2_3035$demo_value <- rlnorm(nrow(nuts2_3035), 3, 0.8)
+
+brks <- classIntervals(nuts2_3035$demo_value, n = 5, style = "jenks")$brks
+nuts2_3035$bin <- cut(nuts2_3035$demo_value, brks, include.lowest = TRUE)
+
+ggplot(nuts2_3035) +
+  geom_sf(aes(fill = bin), colour = "white", linewidth = 0.3) +
+  theme_minimal() +
+  labs(
+    title = "NUTS2 choropleth, Jenks-binned",
+    fill = "Value\n(Jenks bins)"
+  )
+```
+
+No `scale_fill_*()` is set explicitly here - the fill comes from this
+project's own `set_default_palettes()` (`R/functions.R`,
+`ggplot2.discrete.fill = "viridis"`), confirmed still applying correctly
+to a discrete `sf` fill exactly as it does to any other discrete
+`ggplot2` scale.
+
+A base `theme_minimal()`/`theme_void()` with the graticule stripped
+(`panel.grid = element_blank()`) is the usual choropleth base - left in
+for these figures since the lat/lon graticule is informative context in
+a projection-comparison notebook, but for a manuscript figure the
+cleaner starting point is `theme_void()`.
+
+# Labels: `geom_sf_shadowtext()` for legibility over complex fills
+
+A plain `geom_sf_text()`/`geom_sf_label()` label can disappear against a
+busy multi-coloured background. `geom_sf_shadowtext()` (`R/functions.R`)
+gives every label a white halo, the same technique
+[GuangchuangYu/shadowtext](https://github.com/GuangchuangYu/shadowtext)
+uses for plain `x`/`y` text - ported here to work with `sf` geometry
+columns via `stat = "sf_coordinates"`, the same mechanism
+`geom_sf_text()` itself uses.
+
+```{r}
+#| label: fig-shadowtext
+#| fig-cap: "Country labels over a filled polygon layer, with and without a shadow"
+#| fig-width: 9
+#| fig-height: 5
+nordics <- ne_countries(
+  country = c("Norway", "Sweden", "Finland", "Denmark"),
+  scale = "medium",
+  returnclass = "sf"
+)
+nordics$centroid <- st_centroid(nordics$geometry)
+
+p_plain <- ggplot(nordics) +
+  geom_sf(aes(fill = name)) +
+  geom_sf_text(aes(geometry = centroid, label = name), colour = "black", size = 4) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(title = "geom_sf_text() - no shadow")
+
+p_shadow <- ggplot(nordics) +
+  geom_sf(aes(fill = name)) +
+  geom_sf_shadowtext(
+    aes(geometry = centroid, label = name),
+    bg.colour = "white",
+    colour = "black",
+    size = 4
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  labs(title = "geom_sf_shadowtext() - white halo")
+
+p_plain | p_shadow
+```
+
+Both labels sit on the same fill colours here, so the difference is
+subtle at this figure's size - it stops being subtle the moment a label
+lands on a genuinely dark or highly-saturated fill (a dark end of a
+viridis/scico scale, in particular), which is exactly the case this
+technique is for.
+
+# Insets: `patchwork::inset_element()` vs `cowplot::draw_plot()`
+
+Norway's NUTS2 set above included Svalbard, ~800km north of the
+mainland - the standard cartographic answer is an inset, not a bounding
+box that includes both and squashes the mainland. **Confirmed
+`patchwork` alone can do this** - `cowplot` is not required just for
+this technique, contrary to an easy assumption that `cowplot` is the
+only option.
+
+```{r}
+#| label: fig-inset-patchwork
+#| fig-cap: "Mainland Norway with a Svalbard inset, via patchwork::inset_element()"
+#| fig-width: 6
+#| fig-height: 7
+mainland <- ggplot(norway) +
+  geom_sf(fill = "grey85") +
+  coord_sf(xlim = c(4, 32), ylim = c(57, 71.5), expand = FALSE, crs = 4326) +
+  theme_minimal() +
+  labs(title = "Mainland Norway")
+
+svalbard <- ggplot(norway) +
+  geom_sf(fill = "grey85") +
+  coord_sf(xlim = c(9, 34), ylim = c(74, 81), expand = FALSE, crs = 4326) +
+  theme_void() +
+  theme(
+    panel.background = element_rect(fill = "white"),
+    panel.border = element_rect(colour = "black", fill = NA, linewidth = 1)
+  )
+
+mainland + inset_element(svalbard, left = 0.55, bottom = 0.65, right = 1, top = 1)
+```
+
+```{r}
+#| label: fig-inset-cowplot
+#| fig-cap: "The same inset, via cowplot::draw_plot() - visually equivalent"
+#| fig-width: 6
+#| fig-height: 7
+ggdraw(mainland) +
+  draw_plot(svalbard, x = 0.55, y = 0.65, width = 0.42, height = 0.32)
+```
+
+Two things confirmed while testing this, both easy to miss:
+
+- **`theme_void()` sets `panel.background = element_blank()`** - fully
+  transparent, not just borderless. An inset built with a bare
+  `theme_void()` renders with no visible fill at all against a white
+  page, indistinguishable from "the inset didn't render" unless an
+  explicit `panel.background = element_rect(fill = "white")` (or
+  similar) is added, as above.
+- **Loading both packages in one session masks
+  `patchwork::align_plots()` with `cowplot`'s own version** (`cowplot`
+  attached after `patchwork`, per this notebook's own setup chunk) -
+  confirmed via R's own startup message, not assumed. Only relevant if
+  a document actually calls `align_plots()` - `inset_element()` itself
+  is unaffected - but worth knowing before reaching for that specific
+  function with both packages loaded.
+
+**Recommendation: default to `patchwork::inset_element()`**, not
+`cowplot`, given this project already depends on `patchwork` for every
+other plot-combining need (see [plots-mre.qmd](plots-mre.qmd)) - adding
+`cowplot` only pays for itself if a specific pixel-precise placement
+need comes up that `inset_element()`'s `align_to` options don't cover.
+
+# Marine/ocean data: `mregions2` and `marmap`
+
+General-purpose land boundaries (`rnaturalearth`/`giscoR`) have no
+concept of a named sea area or an Exclusive Economic Zone - that's a
+different data domain, maintained by the Flanders Marine Institute
+(VLIZ) and published at marineregions.org, including the IHO's own
+"Limits of Oceans and Seas" boundaries. **`mregions2` is the R-native
+access point for all of it**, querying VLIZ's OGC API directly and
+returning `sf`.
+
+```{r}
+#| label: fig-iho-vs-eez
+#| fig-cap: "IHO Sea Areas vs Norway's actual EEZ boundary - genuinely different shapes"
+#| fig-width: 8
+#| fig-height: 8
+iho_north <- mrp_get(
+  "iho",
+  cql_filter = "name IN ('Norwegian Sea', 'North Sea')"
+)
+eez_norway <- mrp_get("eez", cql_filter = "territory1 = 'Norway'")
+
+ggplot() +
+  geom_sf(data = iho_north, aes(fill = name), alpha = 0.4, colour = NA) +
+  geom_sf(data = eez_norway, fill = NA, colour = "black", linewidth = 0.6, linetype = "dashed") +
+  geom_sf(data = europe, fill = "grey90", colour = "grey40") +
+  coord_sf(xlim = c(-15, 40), ylim = c(55, 82)) +
+  scale_fill_brewer(palette = "Set2", name = "IHO Sea Area") +
+  theme_minimal() +
+  labs(
+    title = "IHO Sea Areas (fill) vs Norway's EEZ (dashed outline)",
+    subtitle = "A legal/economic boundary and a 1953 cartographic convention - not the same shape"
+  )
+```
+
+The IHO fill and the EEZ outline visibly diverge - confirms these are
+two genuinely different boundary concepts, not two sources for the same
+thing. **Two gotchas found while building that figure**:
+
+- **`mregions2::mrp_list` is a static data frame, not a function** -
+  despite the naming convention of everything else in the package
+  (`mrp_get()`, `mrp_view()`, ...), calling it as `mrp_list()` fails with
+  `could not find function "mrp_list"`. Reference it bare (`mrp_list`)
+  to browse the available layer catalogue and find the right `layer`
+  code (`"iho"`, `"eez"`, ...) for `mrp_get()`.
+- **IHO names don't always match the expected English spelling** -
+  querying for `'%Barents%'` returns nothing; the actual name in this
+  gazetteer is `"Barentsz Sea"` (the historical Dutch spelling, after
+  Willem Barentsz). Use `gaz_search()` or a wildcard `LIKE` filter to
+  confirm a name before assuming a `cql_filter` returned everything it
+  should have.
+
+Bathymetry is a separate concern from named-area boundaries -
+**`marmap`** wraps a live NOAA/GEBCO grid fetch, and converts cleanly
+into this same `sf`/`ggplot2` pipeline via `terra`/`tidyterra`:
+
+```{r}
+#| label: fig-bathymetry
+#| fig-cap: "GEBCO bathymetry off the Norwegian coast, via marmap + tidyterra"
+#| fig-width: 7
+#| fig-height: 6
+bathy <- getNOAA.bathy(
+  lon1 = 0,
+  lon2 = 15,
+  lat1 = 58,
+  lat2 = 66,
+  resolution = 10,
+  keep = TRUE
+)
+bathy_rast <- terra::rast(marmap::as.raster(bathy))
+
+ggplot() +
+  geom_spatraster(data = bathy_rast) +
+  scale_fill_hypso_tint_c(
+    palette = "colombia_bathy",
+    guide = guide_colorbar(title = "Depth (m)")
+  ) +
+  theme_minimal() +
+  labs(title = "Bathymetry, Norwegian coastal shelf (GEBCO via marmap)")
+```
+
+The white patches are land, not missing data - confirmed by inspecting
+the raster's own elevation values there (positive, not `NA`).
+`scale_fill_hypso_tint_c()`'s `_bathy`-suffixed palettes assume every
+cell is a negative depth; a land cell's positive elevation falls outside
+that assumed range and renders blank rather than erroring, which reads
+as a data gap unless checked. Fine for a bathymetry-only figure (crop to
+water before plotting, or accept blank land as context); reach for a
+combined hypsometric-tint palette instead if land relief needs to show
+too.
+
+::: {.callout-note}
+## Network dependency, not just a footnote
+
+Every fetch in this section (`rnaturalearth`/`giscoR`'s first download,
+`mregions2`'s OGC queries, `marmap`'s NOAA grid request) is a live
+network call, made fresh on every render given this project's
+`freeze: false` setting (see CLAUDE.md's "Related, separate gotcha" on
+why freeze is off). `marmap::getNOAA.bathy(..., keep = TRUE)` caches its
+result to a local CSV keyed by the bounding box/resolution, so repeat
+renders of the *same* extent reuse it; `rnaturalearth`/`giscoR` cache
+downloaded boundary files similarly. A CI runner with no prior cache, or
+a network-restricted environment, will hit these servers fresh - same
+category of risk already flagged for `cetz`'s package fetch in
+[diagrams-mre.qmd](diagrams-mre.qmd), not independently re-verified
+against a restricted CI runner here.
+:::
+
+# References

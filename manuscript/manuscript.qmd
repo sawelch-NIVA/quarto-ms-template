@@ -47,6 +47,7 @@ library(targets)
 library(here)
 here::i_am("manuscript/manuscript.qmd")
 source(here("R/functions.R"))
+set_default_palettes()
 ```
 
 ```{r}

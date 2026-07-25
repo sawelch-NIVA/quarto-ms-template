@@ -9,7 +9,7 @@
 #
 # To surface this notebook in the site navigation, see the comment in
 # supplementary/notebook-template.qmd.
-title: "Tables in Quarto: Packages, formats, and bugs"
+title: "Tables: Packages, formats, and bugs"
 params:
   is_html: FALSE
   is_typst: FALSE

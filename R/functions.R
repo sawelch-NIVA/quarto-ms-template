@@ -61,6 +61,39 @@ detect_render_format <- function() {
   )
 }
 
+# --- Default plot colour scales ------------------------------------------
+
+#' Set project-wide default ggplot2 colour/fill scales
+#'
+#' viridis, not ggplot2's own hue-wheel defaults - see
+#' manuscript/supplementary/colour-mre.qmd for why: the built-in defaults
+#' lost on every scale type tested there (muddy continuous gradients, a
+#' non-neutral diverging midpoint), while viridis was the one "genuinely
+#' safe default" that came out of that comparison. Confirmed directly
+#' that `options(ggplot2.discrete.colour = "viridis", ...)` is real,
+#' working ggplot2 API (not a hypothetical) - the string form is accepted
+#' directly, no wrapper function needed, and it actually changes both
+#' discrete and continuous scale colours when no `scale_*_()` is set
+#' explicitly in a chunk.
+#'
+#' Global, not automatic: only takes effect in a document that calls this
+#' - `manuscript.qmd` and `notebook-template.qmd` both do, in their setup
+#' chunks, so every new notebook copied from the template inherits it.
+#' A chunk can still override with its own explicit `scale_*_()` call -
+#' this only sets what happens when none is specified. scico remains the
+#' documented (not enforced) recommendation for water/earth-science
+#' figures specifically, per colour-mre.qmd - viridis is the safer
+#' general-purpose default, not a claim that it's always the better
+#' choice.
+set_default_palettes <- function() {
+  options(
+    ggplot2.discrete.colour = "viridis",
+    ggplot2.discrete.fill = "viridis",
+    ggplot2.continuous.colour = "viridis",
+    ggplot2.continuous.fill = "viridis"
+  )
+}
+
 # --- Pipeline-definition noise ------------------------------------------
 
 #' Suppress raw stderr noise from tar_quarto()'s dependency-scanning pass
@@ -142,6 +175,84 @@ flextable_use_format_font <- function(ft) {
   if (is.null(font)) return(ft)
 
   flextable::font(ft, fontname = font, part = "all")
+}
+
+#' Add shadow/outline text to an sf-based ggplot
+#'
+#' Wraps GuangchuangYu's shadowtext (https://github.com/GuangchuangYu/shadowtext)
+#' for sf geometries specifically - shadowtext's own geom_shadowtext() takes
+#' plain x/y aesthetics, not an sf geometry column, so it can't label an
+#' sf layer (e.g. a country/region centroid) directly the way
+#' ggplot2::geom_sf_text()/geom_sf_label() can. This is the sf-aware
+#' counterpart: same stat = "sf_coordinates" mechanism as geom_sf_text(),
+#' with shadowtext::GeomShadowText as the geom instead of GeomText - the
+#' outline is what keeps a label legible sitting on top of a
+#' many-coloured choropleth or coastline, where a plain geom_sf_text()
+#' label can disappear into the background.
+#'
+#' Every external call is namespace-qualified rather than relying on
+#' library() having been called first, matching every other function in
+#' this file (e.g. detect_render_format()'s jsonlite::fromJSON) - R/ is
+#' tar_source()'d on every pipeline load, and this project has no
+#' NAMESPACE/roxygen import mechanism to lean on since there's no
+#' DESCRIPTION file (see CLAUDE.md's "Pipeline gotchas").
+#'
+#' @param mapping Set of aesthetic mappings created by ggplot2::aes()
+#' @param data The data to be displayed (an sf object/column)
+#' @param stat The statistical transformation to use
+#' @param position Position adjustment
+#' @param ... Other arguments passed to the layer (e.g. bg.colour, size)
+#' @param parse If TRUE, labels will be parsed as expressions
+#' @param nudge_x Horizontal adjustment to nudge labels by
+#' @param nudge_y Vertical adjustment to nudge labels by
+#' @param check_overlap If TRUE, overlapping labels will be removed
+#' @param na.rm If FALSE (default), removes missing values with warning
+#' @param show.legend Logical indicating whether this layer should be included in legends
+#' @param inherit.aes If FALSE, overrides default aesthetics
+#' @param fun.geometry Function for transforming geometry (sf-specific)
+#'
+#' @return A ggplot2 layer
+geom_sf_shadowtext <- function(
+  mapping = ggplot2::aes(),
+  data = NULL,
+  stat = "sf_coordinates",
+  position = "identity",
+  ...,
+  parse = FALSE,
+  nudge_x = 0,
+  nudge_y = 0,
+  check_overlap = FALSE,
+  na.rm = FALSE,
+  show.legend = NA,
+  inherit.aes = TRUE,
+  fun.geometry = NULL
+) {
+  if (!missing(nudge_x) || !missing(nudge_y)) {
+    if (!missing(position)) {
+      cli::cli_abort(c(
+        "Both {.arg position} and {.arg nudge_x}/{.arg nudge_y} are supplied.",
+        i = "Only use one approach to alter the position."
+      ))
+    }
+    position <- ggplot2::position_nudge(nudge_x, nudge_y)
+  }
+
+  ggplot2::layer_sf(
+    data = data,
+    mapping = mapping,
+    stat = stat,
+    geom = shadowtext::GeomShadowText,
+    position = position,
+    show.legend = show.legend,
+    inherit.aes = inherit.aes,
+    params = rlang::list2(
+      parse = parse,
+      check_overlap = check_overlap,
+      na.rm = na.rm,
+      fun.geometry = fun.geometry,
+      ...
+    )
+  )
 }
 
 #' Export a single ggplot as a standalone LZW-compressed TIFF

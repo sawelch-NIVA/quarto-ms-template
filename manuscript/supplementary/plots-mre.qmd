@@ -31,6 +31,10 @@ theme_set(theme_minimal(base_size = 12))
 
 ::: {.callout-tip}
 # The Short Version
+- A faceted plot at the document-wide default `fig-width`/`fig-height`
+  degrades fast as panel count grows - override both per chunk (plus a
+  smaller `base_size`) once it does, rather than leaving every plot at
+  one global size regardless of content.
 - `theme_set()` in the setup chunk applies to every later chunk in the
   same render - no need to add `+ theme_something()` to each plot.
 - `ggtext::element_markdown()` lets theme text elements (titles,
@@ -88,6 +92,59 @@ ggplot(mtcars, aes(factor(cyl))) +
   geom_bar(fill = "steelblue") +
   labs(x = "Cylinders", y = "Count")
 ```
+
+# Sizing a faceted plot
+
+Ordinary knitr-managed figures pick up the global `fig-width`/
+`fig-height`/`fig-dpi` settings in `_quarto.yml` (currently 6in × 4in ×
+300dpi, with html getting knitr's `fig.retina = 2` default on top — see
+CLAUDE.md for that finding). That global sizing is a fine default for a
+single plot, but breaks down fast for a faceted plot with many panels.
+
+```{r}
+#| label: fig-simple
+#| fig-cap: "A single plot at the default global fig dimensions"
+d <- data.frame(x = rnorm(100), y = rnorm(100))
+ggplot(d, aes(x, y)) +
+  geom_point() +
+  theme_bw()
+```
+
+## Facets at the default size
+
+```{r}
+#| label: fig-facet-default
+#| fig-cap: "9 facets, default 6x4 global fig dimensions — legibility suffers"
+d2 <- data.frame(
+  x = rnorm(900),
+  y = rnorm(900),
+  g1 = sample(letters[1:3], 900, replace = TRUE),
+  g2 = sample(LETTERS[1:3], 900, replace = TRUE)
+)
+p_facet <- ggplot(d2, aes(x, y)) +
+  geom_point(size = 0.5, alpha = 0.4) +
+  facet_grid(g1 ~ g2) +
+  theme_bw(base_size = 11)
+p_facet
+```
+
+## The same facets, sized for the content instead of the default
+
+Per-chunk `fig-width`/`fig-height` override the document-wide default, and
+a smaller `base_size` keeps facet-strip and axis text from dominating the
+panel:
+
+```{r}
+#| label: fig-facet-fixed
+#| fig-cap: "Same 9 facets, wider/taller + smaller base font"
+#| fig-width: 8
+#| fig-height: 6
+p_facet + theme_bw(base_size = 9)
+```
+
+**Takeaway:** don't leave a multi-facet plot at the document-wide default
+"because that's what everything else uses" — check it renders legibly and
+override `fig-width`/`fig-height` (and font size) per chunk when it doesn't.
 
 # A session-wide theme
 

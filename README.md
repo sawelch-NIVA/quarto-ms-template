@@ -165,18 +165,26 @@ different," on some formats. Headline findings:
   time. Keep typst-bound tables short enough to fit on one page.
 
 `manuscript/supplementary/images-mre.qmd` is the same kind of comparison
-for images and diagrams: mermaid, auto-generated (ggplot2) figures, and
-images created elsewhere and loaded from a file (PNG/JPEG/SVG/TIFF),
-across HTML, docx, and typst. Headline findings:
+for image file formats specifically (a diagram/photo/scan loaded from a
+file, not generated inline by an R chunk) — PNG/JPEG/SVG/PDF/TIFF, across
+HTML, docx, and typst. Headline findings:
 
-- Mermaid diagrams work natively across all three formats with no extra
-  install — Quarto converts them to PNG for docx/typst on its own.
 - PNG/JPEG are the safe defaults everywhere; SVG needs a system
   `rsvg-convert` (librsvg) install for docx to embed cleanly.
 - **TIFF hard-errors typst outright — and because all formats render in
   one pass, that one failure blocks html and docx from updating too**,
   even though they'd render fine on their own. Convert TIFF to PNG before
   embedding.
+- **A referenced PDF fails the opposite way — quietly**: typst embeds it
+  correctly, but html renders a blank box and docx embeds bytes Word
+  can't decode, both with no warning. Treat PDF as submission-only
+  output, not something to embed in the manuscript directly.
+
+Diagram-drawing tools (Mermaid, Graphviz, cetz, ggraph) have their own
+notebook, `manuscript/supplementary/diagrams-mre.qmd` — not covered here,
+this README section hasn't been fully synced with everything added this
+session (colour palettes, diagrams, emoji, `paletteer`); CLAUDE.md is the
+up-to-date source if this page and that disagree.
 - A figure that's legible at authoring size isn't necessarily legible
   once scaled down to page width — check the actual rendered output, not
   the source image.

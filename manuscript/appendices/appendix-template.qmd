@@ -1,0 +1,38 @@
+---
+# Render via `targets::tar_make()` (the `render_manuscript` target in
+# _targets.R), not `quarto render` directly - see manuscript.qmd.
+#
+# Blank starting point for a real appendix - static, journal-supplement-
+# style content (no R execution), as distinct from supplementary/*.qmd's
+# "notebooks with programmatic logic" (see _quarto.yml's Aesthetics/
+# Infrastructure-vs-Appendices sidebar split). Copy this file, rename it,
+# fill it in.
+#
+# To surface a new appendix in the site navigation, add it under the
+# "Appendices" section's `contents:` in _quarto.yml.
+title: "Appendix Template"
+---
+
+```{r}
+#| label: setup
+#| include: false
+# Needed even though an appendix may have no R content of its own -
+# _back-to-manuscript.qmd's include below has a hidden chunk that calls
+# here::here("R/functions.R"), and here() needs *this* document's own
+# i_am() call to anchor correctly - confirmed by direct testing: this
+# renders fine under tar_quarto() (cwd = repo root there always masks a
+# missing anchor) but fails under a direct `quarto render` from inside
+# manuscript/ without it. Every notebook/appendix needs this, "no R code"
+# or not - update the path below to match this file's new name/location.
+here::i_am("manuscript/appendices/appendix-template.qmd")
+```
+
+{{< include ../supplementary/_back-to-manuscript.qmd >}}
+
+Static content with no R code goes here - extended methods, a
+questionnaire, raw supporting text - material that belongs with the
+manuscript but doesn't need `targets`/knitr to produce it. For an
+appendix that *does* run R code, start from
+[Notebook Template](../supplementary/notebook-template.qmd) instead, and
+consider whether it actually belongs under Appendices or Aesthetics/
+Infrastructure in the sidebar.

@@ -109,9 +109,13 @@ manuscript/      a SELF-CONTAINED Quarto project, one level below the repo root 
   supplementary/   extra notebooks (rendered automatically, not auto-linked in nav)
   appendices/      static appendix content, no R execution - as distinct from
                    supplementary/'s "notebooks with programmatic logic" (see
-                   _quarto.yml's sidebar: Notebooks vs Appendices are separate
-                   sections). Same "rendered automatically, not auto-linked"
-                   rule as supplementary/.
+                   _quarto.yml's sidebar: Aesthetics/Infrastructure vs
+                   Appendices are separate sections). Same "rendered
+                   automatically, not auto-linked" rule as supplementary/.
+                   appendix-template.qmd (sidebar: Templates section, same
+                   pattern as supplementary/notebook-template.qmd) is the
+                   blank starting point to copy - the Appendices section
+                   itself starts empty until a real appendix exists.
   styles/          CSL file + Word reference docs (db-space-line-n.docx, standard.docx)
   references.bib   bibliography
   output/          rendered output, all formats (git-ignored, rebuilt by
@@ -249,8 +253,10 @@ independent reason beyond the `tar_read()`/`tar_load()` case above.**
 _back-to-manuscript.qmd >}}` placed *before* its own setup chunk's
 `here::i_am()` call, and never called `here::i_am()` at all (relied
 entirely on `here()`'s upward-search fallback) — `manuscript/appendices/
-appendix-a-example.qmd` had no setup chunk or `here::i_am()` at all,
-having been deliberately written "near-empty." Both rendered fine under
+appendix-a-example.qmd` (since renamed `appendix-template.qmd` — see
+"Directory layout" — the missing anchor was the same bug either way) had
+no setup chunk or `here::i_am()` at all, having been deliberately written
+"near-empty." Both rendered fine under
 every `tar_quarto()`-driven render in this project's history (cwd = repo
 root always trivially satisfies upward search regardless of a missing or
 late anchor) and both hard-errored the moment a direct `quarto render`
@@ -333,15 +339,14 @@ Full writeup lives in the notebook; headline findings:
   keep typst-bound tables short enough to fit one page, or exclude large
   tables from the typst target.
 
-### Images & diagrams (`manuscript/supplementary/images-mre.qmd`)
-Full writeup lives in the notebook; headline findings:
+### Image formats (`manuscript/supplementary/images-mre.qmd`)
+Covers image *file formats* specifically — a diagram/photo/scan loaded
+from a file, not generated inline by an R chunk. Split out of a single
+larger "Images & diagrams" notebook once it grew past that scope —
+Mermaid/Graphviz/cetz/ggraph moved to `diagrams-mre.qmd` (see "Diagrams"
+below), ggplot2 figure sizing moved to `plots-mre.qmd` (see "ggplot2
+graphics" below). Full writeup lives in the notebook; headline findings:
 
-- **Mermaid diagrams (```` ```{mermaid} ````) work natively across
-  html/docx/typst with zero extra install** — Quarto converts them to a
-  static PNG for docx/typst on its own, confirmed with no system
-  Node/Deno/mermaid-cli on `PATH` in this environment. The docx/typst
-  version is a raster image, not an editable diagram, though — a
-  collaborator "fixing it in Word" is editing a picture.
 - **PNG/JPEG are the only formats confirmed to work everywhere with zero
   warnings.**
 - **SVG is native (vector) in html and typst** — typst confirmed via
@@ -353,6 +358,28 @@ Full writeup lives in the notebook; headline findings:
   blank/broken image in Word. Not visually confirmed in actual Word (no
   Word/LibreOffice available in this environment) — treat as
   unverified-risky, not verified-fine, until checked in real Word.
+- **Which R device wrote the SVG matters, not just "it's SVG"**:
+  `svglite` (used throughout this project) writes real `<text>` elements
+  referencing a font by name; base R's `svg()` (Cairo-backed) converts
+  every character to a vector-outline glyph in `<defs>`, placed via
+  `<use xlink:href="#glyph-N">` — confirmed by generating both from
+  identical `grid` content and diffing the markup directly. Both parse
+  as well-formed XML and both render correctly in a Chromium-based
+  browser (checked directly), but the `<use xlink:href="#glyph-N">`
+  self-reference pattern is a specifically documented area of Firefox
+  fragility (Mozilla bugzilla
+  [1778298](https://bugzilla.mozilla.org/show_bug.cgi?id=1778298),
+  [316959](https://bugzilla.mozilla.org/show_bug.cgi?id=316959), and a
+  CSP-related case,
+  [1303364](https://bugzilla.mozilla.org/show_bug.cgi?id=1303364)) that
+  `svglite`'s plain-text approach never exercises. **Not independently
+  reproduced in real Firefox** (no Firefox available in this testing
+  tool, only Chromium/Electron — which is also the likely engine behind
+  Positron's own plot viewer, a plausible full explanation for a
+  "renders in Positron, not in Firefox" symptom without anything being
+  wrong with the file). Already the safer choice in this project
+  (`generate-images.R` uses `svglite` exclusively) — documented for
+  *why*, not as a fix that was needed.
 - **A referenced PDF figure (`ggsave(..., device = cairo_pdf)` output,
   the format journals often want directly) fails quietly in html/docx
   and only actually works in typst — the opposite failure shape from
@@ -401,6 +428,14 @@ Full writeup lives in the notebook; headline findings:
 ### ggplot2 graphics (`manuscript/supplementary/plots-mre.qmd`)
 Full writeup lives in the notebook; headline findings:
 
+- **A faceted plot at the document-wide default `fig-width`/`fig-height`
+  degrades fast as panel count grows** — a 9-panel `facet_grid()` at the
+  global 6×4in default was confirmed illegible; per-chunk
+  `fig-width`/`fig-height` overrides plus a smaller `base_size` fixed it.
+  Don't leave a multi-facet plot at the document default "because
+  everything else uses it" — check it renders legibly. (Moved here from
+  `images-mre.qmd` when that notebook was split by topic — see "Image
+  formats" above.)
 - **`theme_set()` in a `.qmd`'s setup chunk applies to every later chunk
   in that document's own render session** — no need to add
   `+ theme_something()` to each plot. Confirmed scoped correctly to that
@@ -470,11 +505,18 @@ Full writeup lives in the notebook; headline findings:
   original warning in `plots-mre.qmd` itself.
 
 ### Diagrams (`manuscript/supplementary/diagrams-mre.qmd`)
-Full writeup lives in the notebook; headline findings:
+Covers diagram-*drawing* tools (Mermaid, Graphviz/DOT, cetz, ggraph) —
+distinct from "Image formats" above, which covers files loaded from
+disk. Mermaid moved here from a combined "Images & diagrams" notebook
+once that notebook was split by topic. Full writeup lives in the
+notebook; headline findings:
 
-- **Mermaid already covers the zero-install case** — see "Images &
-  diagrams" above, not repeated here. This notebook covers Graphviz/DOT,
-  cetz, and grammar-of-graphics network diagrams (`ggraph`) instead.
+- **Mermaid diagrams (```` ```{mermaid} ````) work natively across
+  html/docx/typst with zero extra install** — Quarto converts them to a
+  static PNG for docx/typst on its own, confirmed with no system
+  Node/Deno/mermaid-cli on `PATH` in this environment. The docx/typst
+  version is a raster image, not an editable diagram, though — a
+  collaborator "fixing it in Word" is editing a picture.
 - **The knitr `dot` engine worked in this environment**, despite
   `Sys.which("dot")` returning empty from a plain diagnostic
   `Rscript -e 'Sys.which("dot")'` check run immediately before and after
@@ -572,6 +614,22 @@ Full writeup lives in the notebook; headline findings:
   (Yan Holtz, built around `paletteer`'s ~2,700-palette collection) —
   previews any palette against real chart types and filters by type/
   length/colourblind-friendliness.
+- **The colour-mre.qmd verdict is now an enforced project default, not
+  just a recommendation**: `set_default_palettes()` (`R/functions.R`)
+  sets `options(ggplot2.discrete.colour = "viridis", ...)` for all four
+  discrete/continuous × colour/fill combinations — confirmed this is
+  real, working `ggplot2` API (the plain string form, no wrapper function
+  needed) that measurably changes a plot's actual colours when no
+  `scale_*_()` is set explicitly. Called from `manuscript.qmd`'s and
+  `notebook-template.qmd`'s own setup chunks (explicitly, not via an
+  implicit side effect of `_back-to-manuscript.qmd`'s shared `source()`
+  call) — every new notebook copied from the template inherits it, a
+  chunk can still override with its own explicit scale. **Deliberately
+  not applied retroactively to every existing notebook** — `colour-mre.qmd`
+  specifically needs to show ggplot2's true, un-overridden defaults to
+  make its own "ggplot2 defaults are the weakest option" comparison mean
+  anything; a global default reaching into that notebook would have
+  quietly invalidated its own findings.
 
 ### Pipeline gotchas
 - `tar_source()` sources every `.R` file directly under `R/` on every

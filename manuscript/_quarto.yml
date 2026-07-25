@@ -55,11 +55,15 @@ website:
           contents:
             - href: manuscript.qmd
               text: "Main File"
+              icon: journal-richtext
         - section: "Templates" # Blank starting points to copy
           contents:
             - href: supplementary\notebook-template.qmd
               text: "Notebook Template"
               icon: journal-code
+            - href: appendices\appendix-template.qmd
+              text: "Appendix Template"
+              icon: file-text
         - section: "Aesthetics" # Visual output: figures, tables, colour, fonts
           contents:
             - href: supplementary\images-mre.qmd
@@ -74,6 +78,8 @@ website:
               icon: journal-code
             - href: supplementary\fonts-mre.qmd
               icon: journal-code
+            - href: supplementary\maps-mre.qmd
+              icon: journal-code
         - section: "Infrastructure" # Build/render/test mechanics, not visual output
           contents:
             - href: supplementary\rendering-pipeline.qmd
@@ -85,11 +91,9 @@ website:
             - href: supplementary\testing-mre.qmd
               text: "Testing R/functions.R"
               icon: journal-code
-        - section: "Appendices" # Static files, no R execution
-          contents:
-            - href: appendices\appendix-a-example.qmd
-              text: "Appendix A: Example"
-              icon: file-text
+        - section: "Appendices" # Static files, no R execution - empty
+          # until a real appendix exists; copy appendices/appendix-template.qmd
+          # (Templates section above) to start one, then list it here.
     tools:
       - href: https://github.com/sawelch-NIVA/quarto-ms-template
         text: "Github Repo"

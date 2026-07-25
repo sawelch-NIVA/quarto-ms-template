@@ -106,7 +106,7 @@ jobs:
       # for ~3h at render_manuscript and was cancelled manually, with
       # orphaned chrome/chrome_crashpad_handler/deno processes left behind
       # at cleanup. Quarto renders this repo's mermaid diagrams
-      # (images-mre.qmd, rendering-pipeline.qmd) to PNG for docx/typst via
+      # (diagrams-mre.qmd, rendering-pipeline.qmd) to PNG for docx/typst via
       # a Deno-managed "chrome-headless-shell" (confirmed as a real,
       # separate ~115MB download via `quarto install chrome-headless-shell`,
       # tested directly in this session - "chromium" is the older, legacy
