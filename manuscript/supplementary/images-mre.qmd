@@ -32,6 +32,13 @@ set.seed(1)
 - SVG is native (vector) in html and typst, but needs `rsvg-convert` on
   PATH for docx — without it, pandoc warns and the docx image has no raster
   fallback
+- **A referenced PDF figure fails quietly, the opposite of TIFF**: typst
+  embeds it correctly as real vector content, but html renders it as a
+  blank box (confirmed in an actual browser, not just the markup — this
+  project's `lightbox: true` even changes *how* it fails, see the
+  section below) and docx embeds raw PDF bytes into a picture element
+  that almost certainly can't decode them — both with zero warning.
+  Treat PDF as submission-only output, not something to embed directly.
 - **TIFF hard-errors typst outright** — and because `tar_quarto()` renders
   all formats in one pass, that one error blocks html and docx from being
   updated too, even though they'd have rendered fine on their own
@@ -197,6 +204,72 @@ like this one.
   Word, so treat this as **unverified-risky**, not verified-fine. Safest
   bet: convert vector diagrams meant for docx to PNG ahead of time, or
   install `rsvg-convert` and re-check in actual Word.
+
+## PDF — the opposite failure shape from TIFF: nothing errors, two formats silently misbehave
+
+A `ggsave(..., device = "pdf")`/`cairo_pdf()` figure is a real, common
+case journals ask for directly (vector, more universally accepted than
+SVG) — worth checking whether a plain `![]()` reference to one behaves
+the way SVG does, rather than assuming.
+
+![PDF (identical content to the SVG above, via `cairo_pdf()` instead of svglite)](../figures/sample-diagram.pdf){#fig-pdf width="50%"}
+
+::: {.callout-warning}
+## Found while testing: PDF's failure mode is the inverse of TIFF's — quiet, not loud
+
+`![](figures/sample-diagram.pdf)` produces **no error and no warning in
+any format** — which sounds better than TIFF's hard typst error, but is
+actually worse in practice, because two of the three formats silently
+do the wrong thing instead of failing loudly:
+
+- 🛑 **html**: renders as a **blank box** — confirmed by actually loading
+  the compiled page in a browser and screenshotting it, not just reading
+  the markup. This project's site-wide `lightbox: true` (`_quarto.yml`)
+  turns out to matter here: a bare Quarto project with lightbox off
+  simply never writes an `<img>` tag for this reference at all (checked
+  first, in an isolated test project); with lightbox on, as this project
+  actually has it, Quarto instead emits `<embed src="....pdf">` — a real
+  tag, no missing markup — but that embed still renders solid blank,
+  confirmed identically whether the page is opened via `file://` or a
+  real local http server (ruling out a "static preview" artifact).
+  **Two different-looking failures depending on a site setting that has
+  nothing to do with images** — check the actual project's config before
+  trusting a minimal reproduction of a rendering question like this one.
+- ⚠️ **docx**: pandoc embeds the raw PDF bytes into a picture element
+  (`<pic:blipFill><a:blip r:embed="..." />`, confirmed by inspecting the
+  docx's raw XML) pointing at a relationship of `Type=".../image"` whose
+  target is literally the `.pdf` file. PDF is not a valid raster format
+  for that XML element (png/jpeg/gif/bmp/tiff/wmf/emf are); Word almost
+  certainly can't decode it. **Not visually confirmed in Word** (same
+  caveat as the SVG section above, no Word available in this
+  environment) — treat as **unverified-risky, leaning broken**, not
+  unverified-fine.
+- ✅ **typst**: genuinely correct, and the best result of the three —
+  confirmed by `pdftotext`-extracting the compiled PDF: the diagram's
+  fine-print label came back as real text, meaning typst embedded the
+  referenced PDF as an actual vector page, not a raster fallback. No
+  warning printed, unlike the SVG case above.
+
+**Practically the reverse lesson from TIFF's section below**: TIFF fails
+loudly in one format and (via `tar_quarto()`'s single invocation)
+silently stalls the *other two* into staleness — a failure you're
+guaranteed to notice, even if the reason takes digging. A plain PDF
+reference fails quietly in two formats that both report success — the
+kind of failure that ships unnoticed unless someone actually opens the
+html and docx output, not just checks that `tar_make()` exited cleanly.
+:::
+
+**Practical takeaway — don't embed a PDF figure directly, same
+conclusion the TIFF section reaches for different reasons**: keep SVG
+(or a PNG fallback) as what actually gets referenced in the manuscript
+for html/docx, and treat a real vector PDF as a *submission-only*
+artifact — generated alongside the embedded figure (e.g. `ggsave(...,
+device = cairo_pdf)` next to the PNG/SVG version), written to
+`submission/` via the same pattern `export_figure_tiff()` already
+uses for TIFF (see "Standalone submission exports" in CLAUDE.md), not
+referenced from `manuscript.qmd` itself. Typst is the one format where
+embedding it directly would actually work cleanly — not worth relying on
+alone, since it fails differently (not loudly) in the other two.
 
 ## TIFF — hard-errors typst, and takes html/docx down with it
 

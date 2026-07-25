@@ -310,6 +310,34 @@ Full writeup lives in the notebook; headline findings:
   blank/broken image in Word. Not visually confirmed in actual Word (no
   Word/LibreOffice available in this environment) — treat as
   unverified-risky, not verified-fine, until checked in real Word.
+- **A referenced PDF figure (`ggsave(..., device = cairo_pdf)` output,
+  the format journals often want directly) fails quietly in html/docx
+  and only actually works in typst — the opposite failure shape from
+  TIFF below (no format hard-errors here, but two silently misbehave
+  instead of one loudly failing).** typst embeds it correctly as real
+  vector content, confirmed via `pdftotext` the same way as SVG above.
+  **html renders it as a blank box** — confirmed by actually loading the
+  compiled page in a browser and screenshotting it (checking the raw
+  markup alone was insufficient here, see below). This project's
+  site-wide `lightbox: true` genuinely changes what "fails" looks like:
+  with lightbox off (checked first, in an isolated non-project test),
+  Quarto never writes an `<img>` tag for a PDF reference at all; with
+  lightbox on, as this project has it, Quarto instead emits `<embed
+  src="....pdf">` — real markup, not missing — but that embed still
+  renders solid blank, confirmed identically over both `file://` and a
+  real local http server (ruling out a static-preview-only artifact).
+  **docx embeds the raw PDF bytes into a picture element**
+  (`<pic:blipFill><a:blip r:embed="..." />` pointing at a relationship
+  `Target="media/*.pdf"`), confirmed by inspecting the docx's raw XML —
+  PDF isn't a valid raster format for that element (png/jpeg/gif/bmp/
+  tiff/wmf/emf are); Word almost certainly can't decode it, though not
+  visually confirmed in real Word here, same caveat as SVG above.
+  **Practical takeaway, same conclusion as TIFF below for a different
+  reason: don't embed a PDF figure directly** — keep SVG/PNG as what the
+  manuscript actually references, and treat a real vector PDF as
+  submission-only output (same `submission/`-directory pattern
+  `export_figure_tiff()` already uses — see "Standalone submission
+  exports" below), not something `manuscript.qmd` links to.
 - **TIFF hard-errors typst** (`error: unknown image format`) — typst's
   image decoder doesn't support it at all. **Consequential part:**
   `tar_quarto()`/`quarto render --to all` renders every format from one

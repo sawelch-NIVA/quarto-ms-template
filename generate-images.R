@@ -16,6 +16,10 @@
 #   figures/sample-diagram.svg - true vector diagram (boxes/arrows/fine text)
 #                                via svglite, standing in for an Illustrator/
 #                                Inkscape/PowerPoint export
+#   figures/sample-diagram.pdf - identical content to the SVG above, via
+#                                cairo_pdf() instead of svglite - a direct,
+#                                controlled SVG-vs-PDF comparison for
+#                                supplementary/images-mre.qmd's PDF section
 
 library(magick)
 library(svglite)
@@ -80,33 +84,46 @@ image_write(img, file.path(out_dir, "sample-photo.jpg"), format = "jpg", quality
 # uncompressed here just bloats the repo.
 image_write(img, file.path(out_dir, "sample-scan.tiff"), format = "tiff", compression = "LZW")
 
-# --- Vector content: a small schematic drawn directly with grid/svglite ----
+# --- Vector content: a small schematic drawn directly with grid ----
+# Factored into a function so the SVG and PDF fixtures draw identical
+# content - the only variable being compared is the container format.
+draw_sample_diagram <- function() {
+  grid.newpage()
+  boxes <- data.frame(
+    x = c(0.15, 0.5, 0.85),
+    y = c(0.5, 0.5, 0.5),
+    label = c("Raw data", "Processing", "Manuscript")
+  )
+  for (i in seq_len(nrow(boxes))) {
+    grid.roundrect(
+      x = boxes$x[i], y = boxes$y[i], width = 0.22, height = 0.28,
+      gp = gpar(fill = "grey95", col = "black", lwd = 1.2)
+    )
+    grid.text(boxes$label[i], x = boxes$x[i], y = boxes$y[i], gp = gpar(fontsize = 11))
+  }
+  grid.text(
+    "microscopic fine print to test vector text legibility at small sizes",
+    x = 0.5, y = 0.12, gp = gpar(fontsize = 6)
+  )
+  for (i in 1:2) {
+    grid.lines(
+      x = c(boxes$x[i] + 0.11, boxes$x[i + 1] - 0.11),
+      y = c(0.5, 0.5),
+      arrow = arrow(length = unit(2, "mm")),
+      gp = gpar(lwd = 1.5)
+    )
+  }
+}
+
 svglite(file.path(out_dir, "sample-diagram.svg"), width = 7, height = 4)
-grid.newpage()
-boxes <- data.frame(
-  x = c(0.15, 0.5, 0.85),
-  y = c(0.5, 0.5, 0.5),
-  label = c("Raw data", "Processing", "Manuscript")
-)
-for (i in seq_len(nrow(boxes))) {
-  grid.roundrect(
-    x = boxes$x[i], y = boxes$y[i], width = 0.22, height = 0.28,
-    gp = gpar(fill = "grey95", col = "black", lwd = 1.2)
-  )
-  grid.text(boxes$label[i], x = boxes$x[i], y = boxes$y[i], gp = gpar(fontsize = 11))
-}
-grid.text(
-  "microscopic fine print to test vector text legibility at small sizes",
-  x = 0.5, y = 0.12, gp = gpar(fontsize = 6)
-)
-for (i in 1:2) {
-  grid.lines(
-    x = c(boxes$x[i] + 0.11, boxes$x[i + 1] - 0.11),
-    y = c(0.5, 0.5),
-    arrow = arrow(length = unit(2, "mm")),
-    gp = gpar(lwd = 1.5)
-  )
-}
+draw_sample_diagram()
+dev.off()
+
+# cairo_pdf(), not the base pdf() device - modern font handling/embedding,
+# same reasoning as ragg over png() elsewhere in this project (see
+# supplementary/fonts-mre.qmd).
+cairo_pdf(file.path(out_dir, "sample-diagram.pdf"), width = 7, height = 4)
+draw_sample_diagram()
 dev.off()
 
 message("Wrote fixture images to ", out_dir)
