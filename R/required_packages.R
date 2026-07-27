@@ -80,28 +80,28 @@ required_pkgs <- c(
   # grids respectively - neither has a general-purpose land-map
   # equivalent, both are this project's actual domain (marine work).
   #
-  # rnaturalearthhires deliberately NOT listed here - confirmed by a real
-  # CI failure that it isn't on CRAN at all (only rnaturalearthdata is;
-  # rnaturalearthhires is ~76MB of high-res shapefiles, distributed via
-  # ropensci's r-universe instead, specifically because of that size) -
-  # setup-r-dependencies' public-RSPM-only repo can't resolve it, and
-  # pak's lockfile solver fails the ENTIRE list over that one unresolvable
-  # package, same "dependency conflict" listed against everything
-  # symptom as the tidygraph/NetSwan incident below. It was already
-  # installed on the dev machine this notebook was written on, for
-  # unrelated reasons, so the gap was invisible locally - the same root
-  # cause as that incident, not a new failure mode. Confirmed unneeded:
-  # maps-mre.qmd only ever calls ne_countries(scale = "medium"), never
-  # "large" (the only case that actually needs the hires package) - if a
-  # future edit does need scale = "large", install rnaturalearthhires
-  # locally from r-universe (`install.packages("rnaturalearthhires",
-  # repos = "https://ropensci.r-universe.dev")`) and add a matching
-  # `repos =` entry to the CI workflow's setup-r-dependencies step, not
-  # just to this vector - plain install.packages()-style CRAN listing
-  # here can't reach an off-CRAN package regardless.
+  # rnaturalearthhires: back in this list as of the "Putting it together"
+  # Norway map template in maps-mre.qmd - confirmed by direct testing that
+  # section is the first thing in this notebook to actually need
+  # scale = "large" (ne_countries(country = "Norway", scale = "medium")
+  # silently drops Bouvet Island from its returned multipolygon; only
+  # "large" keeps it - see the notebook for the full comparison table).
+  # rnaturalearthhires isn't on CRAN at all (only rnaturalearthdata is;
+  # it's ~76MB of high-res shapefiles, distributed via ropensci's
+  # r-universe instead, specifically because of that size) - listing it
+  # here alone is NOT sufficient for CI: plain install.packages()-style
+  # CRAN listing can't reach an off-CRAN package regardless of what's in
+  # this vector. The matching fix is on the CI workflow's setup-r@v2 step
+  # (extra-repositories: https://ropensci.r-universe.dev), not here - see
+  # .github/workflows/render.yml. Previously deliberately excluded for
+  # exactly this reason, before any notebook needed scale = "large" -
+  # that gap was invisible locally because it was already installed on
+  # the dev machine for unrelated reasons, the same root cause as the
+  # tidygraph/NetSwan incident below.
   "sf",
   "rnaturalearth",
   "rnaturalearthdata",
+  "rnaturalearthhires",
   "giscoR",
   "eurostat",
   "ggspatial",

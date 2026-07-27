@@ -339,6 +339,35 @@ Full writeup lives in the notebook; headline findings:
   keep typst-bound tables short enough to fit one page, or exclude large
   tables from the typst target.
 
+### Callout blocks in typst (`manuscript/supplementary/maps-mre.qmd`)
+**A second, separate typst-only layout bug, pre-existing and not
+introduced by any specific edit — found while adding a bullet to
+`maps-mre.qmd`'s "The Short Version" callout, but confirmed (by
+rendering the pre-existing 9-bullet version of that same callout,
+before any new content was added) to already overflow its own box
+border in the typst PDF even without the new bullet.** A
+`::: {.callout-tip}`/`{.callout-note}` div tall enough to approach a
+page boundary doesn't reflow onto the next page in typst the way a
+plain paragraph does — text keeps flowing past the box's bottom border
+instead, and once there's enough overflow, wraps back on top of itself
+at a fixed point rather than continuing to spill downward, producing
+genuinely overlapping, hard-to-read text (confirmed via a rendered page
+image, not just `pdftotext` — `pdftotext` extraction of the same
+overlap read as a plausible-looking but wrong string, `NUT2S3` for
+`NUTS3`, one more reason to visually check a typst-rendered PDF rather
+than trust extracted text alone for anything box/layout-related). Same
+underlying category as the page-break table bug above (typst mishandling
+content that needs to span a page boundary), different content type —
+neither is something this project's own settings caused or can
+configure around from Quarto's side. **Not fixed here** — flagged as a
+follow-up: either shorten `maps-mre.qmd`'s "Short Version" callout to
+comfortably fit above the page's bottom margin, or split it into two
+smaller callouts, whichever reads better once someone sits down to
+verify the exact line budget in real typst output (html and docx are
+unaffected — this is one more instance of "a bug can be entirely
+specific to one target format," same lesson as everywhere else in this
+file).
+
 ### Image formats (`manuscript/supplementary/images-mre.qmd`)
 Covers image *file formats* specifically — a diagram/photo/scan loaded
 from a file, not generated inline by an R chunk. Split out of a single

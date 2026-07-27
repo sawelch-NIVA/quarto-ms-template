@@ -96,6 +96,11 @@ set_default_palettes()
   `tidyterra`'s `_bathy`-suffixed hypsometric palettes specifically: they
   assume every cell is a negative depth, so land cells in the same
   raster render blank, not an obviously-wrong colour.
+- **"Putting it together" below combines every technique above into one
+  reusable Norway map template** (mainland + a `patchwork` inset per
+  remote territory) - and surfaced a generic gotcha worth knowing
+  either way: **an opaque inset silently hides whatever of the base
+  plot sits underneath it**, confirmed only by rendering and looking.
 :::
 
 # Why this notebook exists
@@ -186,16 +191,25 @@ manually-downloaded shapefile:
 
 - **`rnaturalearth`** (+ `rnaturalearthdata`) - general-purpose country/
   state boundaries at three scales (`"small"`/`"medium"`/`"large"`),
-  `sf` directly via `ne_countries()`/`ne_states()`. Every example in
-  this notebook uses `scale = "medium"` (`rnaturalearthdata`, on CRAN) -
-  `scale = "large"` needs the companion `rnaturalearthhires` package
-  too, which is **not** on CRAN (confirmed by a real CI failure: it's
-  ~76MB of high-res shapefiles, kept off CRAN and distributed via
-  ropensci's r-universe instead) and so isn't in this project's
-  `R/required_packages.R` - install it separately
-  (`install.packages("rnaturalearthhires", repos =
-  "https://ropensci.r-universe.dev")`) only if a future edit actually
-  needs `scale = "large"`.
+  `sf` directly via `ne_countries()`/`ne_states()`. Every example up to
+  this point in the notebook uses `scale = "medium"` (`rnaturalearthdata`,
+  on CRAN) - `scale = "large"` needs the companion `rnaturalearthhires`
+  package too, which is **not** on CRAN (~76MB of high-res shapefiles,
+  kept off CRAN and distributed via ropensci's r-universe instead).
+  **Now a real dependency, not a hypothetical**: the combined template
+  in "Putting it together" below is the first thing in this notebook
+  that actually needs `scale = "large"` - confirmed by direct testing
+  that `ne_countries(country = "Norway")` returns Bouvet Island
+  (~54°S, the notebook's most remote territory) only at `scale =
+  "large"`; `scale = "medium"` still includes Jan Mayen but silently
+  drops Bouvet Island, and `scale = "small"` drops Jan Mayen too. See
+  that section for the rest of this finding (all four territories turn
+  out to be one single multipolygon feature, not separate rows).
+  `rnaturalearthhires` is accordingly back in `R/required_packages.R`,
+  with a matching `extra-repositories:` entry added to the CI
+  workflow's `setup-r@v2` step (plain `install.packages()`-style CRAN
+  listing can't reach an off-CRAN package regardless of what's in that
+  vector).
 - **`giscoR`** - Eurostat/GISCO's own boundaries, and **the best source
   specifically for Europe** because it gives NUTS-level regions
   natively, at the actual resolution Eurostat itself publishes.
@@ -597,6 +611,242 @@ as a data gap unless checked. Fine for a bathymetry-only figure (crop to
 water before plotting, or accept blank land as context); reach for a
 combined hypsometric-tint palette instead if land relief needs to show
 too.
+
+# Putting it together: a Norway map template
+
+Everything above is a separate technique, confirmed in isolation.
+Combining them into one figure is a different, harder problem - it's
+also the actually-useful end product for a real manuscript (this
+project's own domain being Norwegian marine/water science), so this
+section builds one: mainland Norway with NUTS3 boundaries, an inset per
+remote territory (Svalbard, including Bjørnøya/Bear Island; Jan Mayen;
+Bouvet Island), country/territory name labels, city labels, and the rest
+of Europe present but visually out of the way.
+
+## Data: one `ne_countries()` call covers every territory
+
+```{r}
+#| label: template-data
+norway_hires <- ne_countries(country = "Norway", scale = "large", returnclass = "sf")
+europe_context <- ne_countries(continent = "Europe", scale = "medium", returnclass = "sf")
+europe_context <- europe_context[europe_context$name != "Norway", ]
+
+nuts3_no <- gisco_get_nuts(nuts_level = 3, country = "Norway", resolution = "10")
+nuts3_mainland <- nuts3_no[!nuts3_no$NUTS_ID %in% c("NO0B1", "NO0B2"), ]
+
+# norway_cities/places already fetched in "Cities: point data, not
+# boundaries" above - same chunk-execution session, no need to re-fetch.
+svalbard_places <- places[places$NAME == "Longyearbyen", ]
+
+country_labels <- st_as_sf(
+  data.frame(
+    label = c("NORWAY", "Sweden", "Finland"),
+    lon = c(9.5, 15, 22),
+    lat = c(61.2, 62, 68)
+  ),
+  coords = c("lon", "lat"), crs = 4326
+)
+
+bear_island_label <- st_as_sf(
+  data.frame(label = "Bjørnøya\n(Bear Island)", lon = 19.0, lat = 74.35),
+  coords = c("lon", "lat"), crs = 4326
+)
+```
+
+**`ne_countries(country = "Norway", scale = "large")` returns a single
+row** - one `MULTIPOLYGON` geometry that already bundles mainland Norway,
+Svalbard (Bjørnøya/Bear Island included, as one of its ~120 constituent
+polygon parts), Jan Mayen, *and* Bouvet Island together under the one
+`name == "Norway"` feature. Confirmed directly: none of these four are
+separate named rows at any scale - searching `ne_countries(scale =
+...)`'s `name`/`name_long` columns for `"Svalbard"`, `"Jan Mayen"`, or
+`"Bouvet"` returns zero matches regardless of scale, because they were
+never separate features to find. The only way to isolate one territory
+from another is to crop by its own bounding box (`st_crop()`, or
+`coord_sf(xlim=, ylim=)` at draw time, as the inset builder below does),
+not to filter by name.
+
+**Confirmed by direct testing which `scale` actually keeps which
+territory** - this is the concrete reason this section needs `scale =
+"large"` when nothing earlier in the notebook did:
+
+| `scale` | mainland | Svalbard | Jan Mayen | Bouvet Island |
+|---|---|---|---|---|
+| `"large"`  | yes | yes | yes | **yes** |
+| `"medium"` | yes | yes | yes | no |
+| `"small"`  | yes | yes | no  | no |
+
+`scale = "medium"` (`rnaturalearthdata`, on CRAN, what every earlier
+example in this notebook uses) silently drops Bouvet Island from the
+same bundled multipolygon rather than erroring - confirmed by cropping
+each scale's returned geometry to Bouvet's known bounding box (~54.4°S,
+3.4°E) and checking whether anything survives. Only `scale = "large"`
+(`rnaturalearthhires`, off-CRAN - see "Boundary and geodata sources"
+above for the CI implication) keeps all four.
+
+## The mainland panel
+
+```{r}
+#| label: template-mainland
+mainland <- ggplot() +
+  geom_sf(data = europe_context, fill = "grey92", colour = "grey80", linewidth = 0.15) +
+  geom_sf(data = nuts3_mainland, fill = "white", colour = "grey30", linewidth = 0.35) +
+  geom_sf_text(
+    data = country_labels[country_labels$label %in% c("Sweden", "Finland"), ],
+    aes(label = label), colour = "grey40", size = 3, fontface = "italic"
+  ) +
+  geom_sf_text(
+    data = country_labels[country_labels$label == "NORWAY", ],
+    aes(label = label), colour = "grey15", size = 4.5, fontface = "bold"
+  ) +
+  geom_sf(data = norway_cities, colour = "black", size = 1.5) +
+  geom_sf_shadowtext(
+    data = norway_cities, aes(label = NAME),
+    bg.colour = "white", colour = "black", size = 3, fontface = "bold",
+    nudge_x = 0.6, hjust = 0
+  ) +
+  coord_sf(xlim = c(3, 32), ylim = c(57.5, 71.5), expand = FALSE, crs = 4326) +
+  theme_bw() +
+  theme(
+    panel.grid = element_line(colour = "grey85", linewidth = 0.25),
+    axis.text = element_text(size = 7, colour = "grey30"),
+    axis.ticks = element_line(colour = "grey50", linewidth = 0.3),
+    axis.title = element_blank()
+  ) +
+  labs(title = "Norway: NUTS3 regions", caption = "Boundaries: GISCO/Eurostat. Basemap: Natural Earth.")
+```
+
+This is the split the brief asked for: **`geom_sf_text()` (plain, no
+halo) for country/territory names** - Norway itself and its neighbours,
+sparse enough that a plain label reads fine against the de-emphasised
+backdrop - **vs. `geom_sf_shadowtext()` for cities**, which sit directly
+on top of Norway's own NUTS3 fill and need the halo for the same reason
+the "Labels" section above demonstrated. "De-emphasise the rest of
+Europe" is deliberately not just a fainter fill: `europe_context` gets a
+flat pale grey with thin, low-contrast borders (`grey80`, `linewidth =
+0.15`), while `nuts3_mainland` gets a plain white fill with visibly
+darker, thicker boundaries (`grey30`, `linewidth = 0.35`) - the boundary
+weight difference is what actually separates "the subject" from "the
+context" at a glance, more than the fill colour does on its own. Norway
+is left plain white rather than given an illustrative choropleth fill
+(unlike `fig-choropleth` above) precisely because this is meant as a
+*template* - a real manuscript figure drops its own `aes(fill = ...)`
+onto `nuts3_mainland` here.
+
+`theme_bw()`, not `theme_minimal()`, is the base theme here - deliberately
+different from the plain `theme_minimal()` used for most other figures in
+this notebook, specifically to keep the graticule (as `panel.grid`,
+drawn straight rather than curved since this whole figure stays in
+un-projected EPSG:4326) and the degree-formatted axis text/ticks
+`coord_sf()` computes automatically. Both are toned down (`grey85`
+gridlines, `grey30` 7pt axis text) rather than left at `theme_bw()`'s
+own black-on-white default, so they read as reference context rather
+than competing with the labels and boundaries that are the actual point
+of the figure.
+
+## One inset builder, three territories
+
+```{r}
+#| label: template-insets
+build_inset <- function(xlim, ylim, title) {
+  ggplot() +
+    geom_sf(data = norway_hires, fill = "grey85", colour = "grey40", linewidth = 0.3) +
+    coord_sf(xlim = xlim, ylim = ylim, expand = FALSE, crs = 4326) +
+    theme_bw() +
+    theme(
+      panel.grid = element_line(colour = "grey85", linewidth = 0.2),
+      axis.text = element_text(size = 5, colour = "grey30"),
+      axis.ticks = element_line(colour = "grey50", linewidth = 0.25),
+      axis.title = element_blank(),
+      panel.border = element_rect(colour = "black", fill = NA, linewidth = 0.8),
+      plot.title = element_text(size = 8, hjust = 0.5, margin = margin(b = 2))
+    ) +
+    labs(title = title)
+}
+
+svalbard <- build_inset(xlim = c(9, 34), ylim = c(74, 81), title = "Svalbard") +
+  geom_sf_text(
+    data = bear_island_label, aes(label = label),
+    size = 2.2, lineheight = 0.85, nudge_x = 3.5
+  )
+jan_mayen <- build_inset(xlim = c(-10, -7), ylim = c(70.7, 71.2), title = "Jan Mayen")
+bouvet <- build_inset(xlim = c(3, 4), ylim = c(-54.6, -54.3), title = "Bouvet Island")
+```
+
+Each inset crops the *same* `norway_hires` object to its own territory's
+bounding box. Unlike the single-inset example in the "Insets" section
+above, these use `theme_bw()` rather than `theme_void()` - for the same
+graticule/axis-text/tick reason as the mainland panel - which
+incidentally sidesteps that section's `panel.background` gotcha
+entirely: `theme_bw()`'s default panel background is already opaque
+white, so nothing here needs the explicit `element_rect(fill = "white")`
+override `theme_void()` required. The explicit `panel.border` override
+is still needed, though - `theme_bw()`'s own default border is a thin
+grey, and a visibly black, thicker frame is what actually reads as "this
+is an inset, not part of the base map" at a glance. Bjørnøya gets its
+own `geom_sf_text()` label layered onto the Svalbard inset specifically,
+since it's a real, separately-named feature a reader would otherwise
+have no way to pick out from the rest of the archipelago.
+
+## Composite: three insets, not one
+
+```{r}
+#| label: fig-norway-template
+#| fig-cap: "A complete Norway map template: mainland NUTS3 + de-emphasised Europe + three remote-territory insets"
+#| fig-width: 8
+#| fig-height: 10
+mainland +
+  inset_element(svalbard, left = 0.70, bottom = 0.72, right = 1.0, top = 1.0) +
+  inset_element(jan_mayen, left = 0.70, bottom = 0.40, right = 1.0, top = 0.68) +
+  inset_element(bouvet, left = 0.70, bottom = 0.02, right = 1.0, top = 0.30)
+```
+
+Stacking three `inset_element()` calls instead of one is a mechanical
+extension of the pattern already used above - `+` composes any number
+of them onto the same base plot - but it surfaced a real bug the
+single-inset version never could: **the first version of this figure
+placed all three insets in a column spanning most of the panel's right
+edge, from `bottom = 0.02` to `top = 1.0`, and that column happened to
+overlap the "Finland" label's actual plotted position.** `inset_element()`
+draws an opaque panel (needed for the reason above), so it doesn't blend
+with or show through whatever the base plot already drew there - it
+simply covers it, with no warning that anything was hidden. The label
+wasn't misplaced or dropped by the code; it rendered exactly where
+specified and was then painted over. Confirmed only by rendering the
+figure and looking - the R code for both the label and the insets was
+individually correct, and nothing about reading either chunk in
+isolation would suggest a conflict between them. Fixed by choosing
+inset bounds that stay clear of every other layer's actual plotted
+extent, not just leaving visual "gaps" in the intended layout - the two
+aren't the same thing once labels can sit anywhere in data space.
+
+::: {.callout-note}
+## Bouvet Island's inset shows almost nothing, and that's correct
+
+Bouvet Island is roughly 49 km² - smaller than most cities. At the
+zoom level needed to make it visible as more than a single pixel, its
+inset legitimately shows just one small grey shape on a white
+background, no coastline detail, no context. That's the real geography,
+not an under-cropped extent.
+:::
+
+::: {.callout-note}
+## A real, narrow encoding gotcha found while writing this section
+
+`"Bjørnøya"`/`"Tromsø"` typed directly as an R string literal rendered
+correctly here (Quarto reads `.qmd` source as UTF-8) - but the same
+literal, tried in a plain `Rscript -e "..."` call from a shell **outside
+Quarto** while drafting this section, came out corrupted on this
+Windows machine. Confirmed the corruption was specific to how that
+string reached R, not a font/glyph problem in the `ragg_png` device
+itself: `"Tromsø"` (the same character, arriving via `ne_download()`'s
+own data rather than a hand-typed literal) rendered correctly in the
+very same corrupted image. Not a Quarto/render-pipeline issue - flagged
+here because a future edit to this notebook done by testing snippets in
+a bare `Rscript` call first, outside `quarto render`/`tar_make()`,
+could otherwise mistake a shell-specific artifact for a real bug in the
+figure itself.
+:::
 
 ::: {.callout-note}
 ## Network dependency, not just a footnote
