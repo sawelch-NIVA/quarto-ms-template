@@ -177,10 +177,3 @@ comments:
 # filters execute (Lua) code on the rendered qmd before creating other formats (stupid name, imho)
 filters: 
   - flextable-qmd
-  - acronyms
-acronyms:
-  keys:
-    - shortname: TLA
-      longname: Three-Letter Acronym
-    - shortname: STOP
-      longname: Source To Outcome Pathway  

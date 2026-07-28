@@ -2,6 +2,14 @@
 # Render via `targets::tar_make()` (the `render_manuscript` target in
 # _targets.R), not `quarto render` directly - see manuscript.qmd.
 title: "Quarto Extensions and Addins"
+filters: 
+  - ../acronyms
+acronyms:
+  keys:
+    - shortname: TLA
+      longname: Three-Letter Acronym
+    - shortname: STOP
+      longname: Source To Outcome Pathway  
 ---
 
 ```{r}
