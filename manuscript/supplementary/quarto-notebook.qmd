@@ -1,0 +1,55 @@
+---
+# Render via `targets::tar_make()` (the `render_manuscript` target in
+# _targets.R), not `quarto render` directly - see manuscript.qmd.
+title: "Quarto Extensions and Addins"
+---
+
+```{r}
+#| label: setup
+#| include: false
+here::i_am("manuscript/supplementary/quarto-notebook.qmd")
+```
+
+{{< include _back-to-manuscript.qmd >}}
+
+- Purpose - info on Quarto Syntax, Extensions and Addins
+
+# VS/Positron Extensions
+
+## [Quarto Wizard](https://m.canouil.dev/quarto-wizard/)
+
+```sh
+positron --install-extension mcanouil.quarto-wizard
+```
+
+# Quarto Extensions
+
+## [Quarto Acronyms](https://github.com/rchaput/acronyms)
+
+Run the below in `manuscript` to install the extension to `_extensions`.
+
+```sh
+quarto add rchaput/acronyms 
+```
+
+Then add as a filter to frontmatter (in this case we have to add it to _quarto.yml or else it will look for the filter in `/supplementary/`), and define some acroynms:
+
+```yml
+---
+filters:
+  - acronyms
+acronyms:
+  keys:
+    - shortname: TLA
+      longname: Three-Letter Acronym
+    - shortname: STOP
+      longname: Source To Outcome Pathway
+---
+```
+
+We can then invoke these acronyms with either Latex-style commands `\acr{KEY}` or newer Quarto shortcodes `{{< acr KEY >}}`. Frankly, both of them impair readability.
+
+Anyway, Acronyms will display key and value for the first time we use an acronym ({{< acr TLA >}}) and subsequently just show the short version ({{< acr TLA >}}).
+
+Unfortunately, it doesn't currently support mouse hover to show definitions.
+

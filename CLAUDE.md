@@ -1,9 +1,11 @@
 # quarto-ms-template
 
+*KEEP IT TERSE, ESPECIALLY IN INLINE COMMENTS*
+
 A Quarto + `targets` template for manuscripts, built to render one
 source to HTML, docx, and typst (PDF) via a reproducible pipeline. This
 file is project memory for Claude Code sessions — see [README.md](README.md)
-for the user-facing docs.
+for the user-facing docs. 
 
 ## Core architectural decision
 
