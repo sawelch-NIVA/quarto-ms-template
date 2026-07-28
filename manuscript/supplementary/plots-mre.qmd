@@ -1,11 +1,5 @@
 ---
-# Render via `targets::tar_make()` (the `render_manuscript` target in
-# _targets.R), not `quarto render` directly - see manuscript.qmd.
-#
-# Minimal reproducible example (MRE) for ggplot2 graphics in this
-# template: a session-wide theme, ggtext markdown text (including a real,
-# confirmed bug), and combining plots with patchwork - including a table
-# grob alongside a plot grob.
+# Render via tar_make(), not quarto render directly - see CLAUDE.md.
 title: "ggplot2: Themes and extensions"
 ---
 
@@ -19,11 +13,7 @@ library(flextable)
 library(here)
 here::i_am("manuscript/supplementary/plots-mre.qmd")
 
-# Sets the default theme for every ggplot built in the REST OF THIS
-# DOCUMENT's render session - no need to add + theme_something() to each
-# plot individually. Scoped to this notebook's own knitr session only
-# (see CLAUDE.md's "Pipeline gotchas" for why each .qmd/partial is its own
-# render context) - it does not affect other notebooks or manuscript.qmd.
+# Scoped to this notebook's own render session only - see CLAUDE.md.
 theme_set(theme_minimal(base_size = 12))
 ```
 
@@ -31,33 +21,22 @@ theme_set(theme_minimal(base_size = 12))
 
 ::: {.callout-tip}
 # The Short Version
+- `theme_set()` in a notebook's setup chunk applies to every later chunk
+  in that render; `ggtext::element_markdown()` lets theme text elements
+  render Markdown (`**bold**`, `*italic*`).
+- **Confirmed real bug (ggplot2 4.0.3)**: adding another complete theme
+  (e.g. `theme_bw()`) after `theme_set()`'d an `element_markdown()`
+  override silently wipes it back to plain text - ggplot2 replaces, not
+  merges, complete themes. Fix: reapply `element_markdown()` after any
+  later complete theme.
 - A faceted plot at the document-wide default `fig-width`/`fig-height`
   degrades fast as panel count grows - override both per chunk (plus a
-  smaller `base_size`) once it does, rather than leaving every plot at
-  one global size regardless of content.
-- `theme_set()` in the setup chunk applies to every later chunk in the
-  same render - no need to add `+ theme_something()` to each plot.
-- `ggtext::element_markdown()` lets theme text elements (titles,
-  subtitles, axis text, captions) render limited Markdown - `**bold**`,
-  `*italic*`, and more.
-- **Confirmed real bug, still present in ggplot2 4.0.3**: adding another
-  *complete* theme (e.g. `+ theme_bw()`) after `theme_set()`'d an
-  `element_markdown()` override silently wipes it back to plain text -
-  not a rendering glitch, a real class change
-  (`element_markdown` → `element_text`), confirmed by inspecting
-  `plot$theme$plot.title`'s class directly, not just by eye. Root cause:
-  ggplot2 *replaces*, not merges, when one complete theme is added on top
-  of another.
-- Fix: reapply the `element_markdown()` override *after* any later
-  complete theme - every time, since order is what matters, not where the
-  original override came from.
-- `patchwork` combines multiple plots (and other grid grobs) with
-  `+`/`/`/`()` and `plot_layout()`/`plot_annotation()`.
-- A table can share a `patchwork` layout with a plot two ways:
-  `patchwork::wrap_table()` for a plain data frame, or
-  `flextable::gen_grob()` + `patchwork::wrap_elements()` for a fully
-  styled `flextable` - ties into this project's own table conventions,
-  see [tables-mre.qmd](tables-mre.qmd).
+  smaller `base_size`) once it does.
+- `patchwork` combines plots (and other grid grobs) with `+`/`/`/`()` and
+  `plot_layout()`/`plot_annotation()`.
+- A table can share a `patchwork` layout with a plot via
+  `patchwork::wrap_table()` (plain data frame) or `flextable::gen_grob()`
+  + `wrap_elements()` (styled `flextable`).
 :::
 
 # Why this notebook exists

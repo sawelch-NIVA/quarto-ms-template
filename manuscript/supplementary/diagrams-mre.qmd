@@ -1,15 +1,5 @@
 ---
-# Render via `targets::tar_make()` (the `render_manuscript` target in
-# _targets.R), not `quarto render` directly - see manuscript.qmd.
-#
-# Minimal reproducible example (MRE) for diagram-drawing tools: Mermaid
-# (zero-install flowcharts/sequence diagrams), Graphviz/DOT (the knitr
-# `dot` engine and DiagrammeR::grViz), cetz (typst-native drawing, reached
-# via a raw `{=typst}` block), and grammar-of-graphics network diagrams in
-# R (ggraph). Render all three formats and open them next to each other.
-#
-# To surface this notebook in the site navigation, see the comment in
-# supplementary/notebook-template.qmd.
+# Render via tar_make(), not quarto render directly - see CLAUDE.md.
 title: "Diagrams: Mermaid, Graphviz, cetz, and ggraph"
 ---
 

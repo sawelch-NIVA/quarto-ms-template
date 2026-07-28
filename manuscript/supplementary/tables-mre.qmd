@@ -1,14 +1,5 @@
 ---
-# Render via `targets::tar_make()` (the `render_manuscript` target in
-# _targets.R), not `quarto render` directly - see manuscript.qmd.
-#
-# Minimal reproducible example (MRE) comparing R's main table packages
-# side by side across HTML, docx, and typst (PDF) output. Render all three
-# formats and open them next to each other when deciding which to
-# standardise on.
-#
-# To surface this notebook in the site navigation, see the comment in
-# supplementary/notebook-template.qmd.
+# Render via tar_make(), not quarto render directly - see CLAUDE.md.
 title: "Tables: Packages, formats, and bugs"
 params:
   is_html: FALSE
@@ -26,13 +17,7 @@ library(flextable)
 library(huxtable)
 library(DT)
 library(here)
-# Missing here() anchor, confirmed a real gap (not defensive styling) by
-# testing a direct `quarto render` rather than tar_quarto(): this
-# notebook's {{< include _back-to-manuscript.qmd >}} needs here() already
-# anchored, and here()'s upward-search fallback alone isn't reliable
-# across every cwd this project renders under - see CLAUDE.md's
-# "Consequence of nesting manuscript/..." section. Every other notebook
-# in this project already does this; this one was the one exception.
+# here::i_am() anchor required before the _back-to-manuscript.qmd include - see CLAUDE.md.
 here::i_am("manuscript/supplementary/tables-mre.qmd")
 
 set.seed(1)

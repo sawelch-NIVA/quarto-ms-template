@@ -1,16 +1,10 @@
 ---
-# Render via `targets::tar_make()` (the `render_manuscript` target in
-# _targets.R), not `quarto render` directly - this file reads pipeline
-# outputs via tar_read()/tar_load(), so a direct render can use stale or
-# missing data.
+# Render via tar_make(), not quarto render directly - see CLAUDE.md.
 title: "Manuscript Title"
-# set author and affiliations in _quarto.yml
-date: today
+date: today # author/affiliations set in _quarto.yml
 abstract: |
   Write a short abstract of the manuscript here.
-# Scoped here, not project-wide in _quarto.yml - see the comment there
-# for the real CI-confirmed bug this avoids for every other notebook.
-bibliography: references.bib
+bibliography: references.bib # scoped here, not _quarto.yml - see CLAUDE.md
 csl: styles/apa.csl # other styles at https://github.com/citation-style-language/styles
 ---
 

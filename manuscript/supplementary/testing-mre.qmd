@@ -1,6 +1,5 @@
 ---
-# ! Render via `targets::tar_make()` (the `render_manuscript` target in
-# ! _targets.R), not `quarto render` directly - see manuscript.qmd.
+# Render via tar_make(), not quarto render directly - see CLAUDE.md.
 title: "Testing without a package structure"
 ---
 
@@ -15,21 +14,16 @@ here::i_am("manuscript/supplementary/testing-mre.qmd")
 
 ::: {.callout-tip}
 # The Short Version
-- Testing is never not a bad idea - checking is always better than assuming.
-- Adding more packages (such as `testthat`) means more things to break.
-- Tests live in `tests/testthat/`, run with `testthat::test_dir("tests/testthat")`
-  - there's no `DESCRIPTION`/`NAMESPACE` here, so the usual package-testing
-  entry points (`devtools::test()`, `R CMD check`) don't apply.
-- `tests/testthat/helper.R` sources `R/functions.R` once for every test
-  file - the stand-in for `library(pkg)`, which a package's own tests get
-  for free.
+- Adding more packages (like `testthat`) means more things that can break
+  - weigh that against what a test actually protects.
+- Tests live in `tests/testthat/`, run via `testthat::test_dir("tests/testthat")`
+  - no `DESCRIPTION`/`NAMESPACE`, so `devtools::test()`/`R CMD check` don't apply.
+- `tests/testthat/helper.R` sources `R/functions.R` once per test file -
+  the stand-in for `library(pkg)`.
 - Coverage is deliberately barebones: `detect_render_format()` (the one
-  function with real, previously-buggy branch logic - see its own roxygen
-  comment) and a smoke test per export helper that just checks a file
-  actually gets written.
+  function with real branch logic) plus a smoke test per export helper.
 - `.github/workflows/render.yml` runs the suite before the pipeline build,
-  so a broken helper function fails as a named test rather than a
-  confusing render error - see [ci-pipeline.qmd](ci-pipeline.qmd).
+  so a broken helper fails as a named test, not a confusing render error.
 :::
 
 # Why this notebook exists

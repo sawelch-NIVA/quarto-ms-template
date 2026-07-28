@@ -1,16 +1,5 @@
 ---
-# Render via `targets::tar_make()` (the `render_manuscript` target in
-# _targets.R), not `quarto render` directly - see manuscript.qmd.
-#
-# Maps: sf + ggplot2::geom_sf() as the drawing layer, R-package-native
-# boundary/statistical sources (rnaturalearth, giscoR, eurostat) instead
-# of hand-downloaded shapefiles, curated city-point sources (rnaturalearth
-# populated_places, giscoR Urban Audit) so "where are the cities" doesn't
-# turn into an ad hoc geocoding project, projections with a Europe focus
-# (EPSG:3035), choropleth styling with classInt breaks, geom_sf_shadowtext()
-# for labels over complex backgrounds, insets (patchwork vs cowplot), and
-# marine-specific data (mregions2's IHO Sea Areas/EEZ, marmap bathymetry) -
-# this project's actual domain (NIVA, marine/water science).
+# Render via tar_make(), not quarto render directly - see CLAUDE.md.
 title: "Maps: sf, geodata sources, projections, and marine layers"
 ---
 
@@ -42,65 +31,23 @@ set_default_palettes()
 
 ::: {.callout-tip}
 # The Short Version
-- **`sf` + `ggplot2::geom_sf()` remains the right default for drawing** -
-  it composes with everything else this template already does
-  (`theme_set()`, `patchwork`, the viridis/scico defaults from
-  [colour-mre.qmd](colour-mre.qmd), `ragg_png`). `ggspatial` adds the one
-  thing `geom_sf()` has no native equivalent for: a scale bar and north
-  arrow.
-- **`rnaturalearth`, `giscoR`, and `eurostat` hand back `sf` objects
-  directly** - no manual shapefile download for any of the boundaries
-  used in this notebook. `giscoR` is the standout for **Europe**
-  specifically: it's Eurostat/GISCO's own NUTS boundaries.
-- **"Where are the cities" has an R-native answer, not just a future
-  geonorge lookup**: `rnaturalearth::ne_download(type =
-  "populated_places")` is a curated global `POINT` dataset that ships
-  its own `POP_MAX`/`SCALERANK`/`LABELRANK` fields - confirmed these
-  exist specifically to answer "which cities are prominent enough to
-  draw at this extent," not just a name/lat/lon dump. `giscoR::
-  gisco_get_urban_audit()` is the Europe-specific complement, curated by
-  Eurostat's own Urban Audit statistical programme membership rather
-  than a population threshold.
-- **Reproject before adding a `ggspatial` scale bar - confirmed this
-  isn't cosmetic.** An un-projected (WGS84 lat/lon) map of Norway
-  triggered a real warning, `Scale on map varies by more than 10%, scale
-  bar may be inaccurate` - confirmed it disappears once the same data is
-  `st_transform()`'d to **EPSG:3035 (ETRS89-LAEA Europe)** first, this
-  notebook's recommended default CRS for any European-extent figure.
-- **`classInt::classIntervals()` breaks (Jenks/quantile) + this
-  project's existing viridis/scico defaults is the right choropleth
-  combo** - same "raw continuous undersells structure" finding
-  [colour-mre.qmd](colour-mre.qmd) already made for a non-spatial
-  heatmap, confirmed again here for polygon fills.
-- **`geom_sf_shadowtext()`** (`R/functions.R`, ported from
-  [GuangchuangYu/shadowtext](https://github.com/GuangchuangYu/shadowtext)
-  for `sf` geometries) - confirmed working for labelling polygons/points
-  where a plain `geom_sf_text()` label would disappear into a
-  multi-coloured background.
-- **`patchwork::inset_element()` and `cowplot::draw_plot()` produced
-  visually identical insets, confirmed side by side** - `cowplot` is not
-  required just to inset one map inside another. Two real gotchas found
-  while confirming that: `theme_void()` strips `panel.background`
-  entirely, so an inset is genuinely transparent (not just borderless)
-  unless given an explicit opaque fill; and loading both packages in one
-  session masks `patchwork::align_plots()` with `cowplot`'s own version.
-- **`mregions2` is the R-native access point for the IHO's own
-  boundaries** (via Flanders Marine Institute/marineregions.org, who
-  maintain the canonical digital version) - confirmed fetching IHO Sea
-  Areas and EEZ layers directly as `sf`. Confirmed concretely that they
-  are genuinely different shapes, not interchangeable: Norway's EEZ and
-  the IHO's "Norwegian Sea" polygon don't align, because one is a legal/
-  economic boundary and the other a 1953 cartographic convention.
-- **`marmap` + `terra`/`tidyterra` pulls real NOAA/GEBCO bathymetry into
-  the same `sf`/`ggplot2` pipeline** - confirmed with a live fetch. Watch
-  `tidyterra`'s `_bathy`-suffixed hypsometric palettes specifically: they
-  assume every cell is a negative depth, so land cells in the same
-  raster render blank, not an obviously-wrong colour.
-- **"Putting it together" below combines every technique above into one
-  reusable Norway map template** (mainland + a `patchwork` inset per
-  remote territory) - and surfaced a generic gotcha worth knowing
-  either way: **an opaque inset silently hides whatever of the base
-  plot sits underneath it**, confirmed only by rendering and looking.
+- `sf` + `geom_sf()` + `ggspatial` (scale bar/north arrow) is the default
+  drawing stack; reproject to **EPSG:3035** first - an unprojected scale
+  bar warns it may be inaccurate.
+- `rnaturalearth`/`giscoR`/`eurostat` hand back `sf` objects directly (no
+  shapefile downloads); `rnaturalearth`'s `populated_places` and `giscoR`'s
+  Urban Audit cover "where are the cities" without ad hoc geocoding.
+- `classInt` breaks + this project's viridis/scico defaults is the right
+  choropleth combo; `geom_sf_shadowtext()` (`R/functions.R`) keeps labels
+  legible over complex fills.
+- `patchwork::inset_element()` and `cowplot::draw_plot()` are visually
+  interchangeable for insets - but `theme_void()` strips
+  `panel.background` (give an inset an explicit opaque fill) and an
+  opaque inset hides whatever's beneath it.
+- `mregions2` gives IHO Sea Areas/EEZ boundaries directly as `sf`
+  (genuinely different shapes, not interchangeable); `marmap` + `terra`
+  pulls real NOAA/GEBCO bathymetry - watch `tidyterra`'s `_bathy` palettes,
+  which assume every cell is a negative depth.
 :::
 
 # Why this notebook exists

@@ -1,17 +1,6 @@
 ---
-# Render via `targets::tar_make()` (the `render_manuscript` target in
-# _targets.R), not `quarto render` directly - see manuscript.qmd.
-#
-# A comparison of ways to display concentration data concisely: density,
-# box/violin, dotplot, and beeswarm/quasirandom variants, on log-normal
-# data spanning very different sample sizes (n=10 to n=10k) and
-# concentration scales - the realistic shape of e.g. pooled monitoring
-# data across sites/analytes. Purpose is to compare legibility and
-# scalability, not to recommend one plot type for every case.
-#
-# To surface this notebook in the site navigation, see the comment in
-# supplementary/notebook-template.qmd.
-title: "Concentrations: displaying skewed data concisely"
+# Render via tar_make(), not quarto render directly - see CLAUDE.md.
+title: "Plotting Concentrations"
 ---
 
 ```{r}
@@ -37,38 +26,21 @@ set_default_palettes()
 
 ::: {.callout-tip}
 # The Short Version
-- Concentration data is usually log-normal and often spans several orders
-  of magnitude across groups - plot on a log10 x-axis
-  (`scale_x_log10(labels = label_log())`) rather than linear, or the small
-  groups collapse to an unreadable spike.
-- **No single geom works well across n=10 to n=10k.** Point-based geoms
-  (jitter, quasirandom, beeswarm, dotplot) show individual observations
-  and work well for small/mid n, but degrade into overplotted blobs at
-  large n. Density-based geoms (density, violin) do the opposite - stable
-  at any n, but hide sample size and can imply structure for n=10 that
-  isn't really there.
-- **A density/violin + point-based overlay is the practical middle
-  ground** for a dataset with mixed group sizes shown together: box or
-  violin for shape, thin jittered/quasirandom points on top for the raw n.
-  Faceting instead of overlaying colour avoids a busy shared axis when
-  group count grows.
-- **`geom_beeswarm()` (strict non-overlap) is only practical below
-  roughly 1,000 points per group** - it visibly slows down past that,
-  confirmed here on the n=10k group. `geom_quasirandom()` (van der Corput
-  sequence, density-proportional but not strictly non-overlapping) scales
-  to any n and is the safer default when group sizes are unknown or mixed.
-- **`geom_dotplot()`'s `binwidth` is in data units, not counts** - the
-  same `binwidth` that looks right for n=10 is far too coarse for n=1k and
-  produces a solid, dot-free-looking block at n=10k. It needs a
-  per-group/per-panel `binwidth`, which makes it a poor fit for directly
-  comparing groups of very different size on one shared scale.
-- **Colouring a swarm/quasirandom plot by group needs an evenly-spaced
-  discrete palette, not this project's `viridis` default** - `viridis`
-  is designed to be read along its full gradient; pulling only 2-3
-  discrete levels from it grabs uneven endpoints (dark purple next to
-  pale yellow) that read unevenly once alpha-blended over overlapping
-  points. `colorspace::scale_colour_discrete_qualitative()` fixes this -
-  same recommendation as `colour-mre.qmd`.
+- Concentration data is usually log-normal and spans orders of magnitude -
+  plot on `scale_x_log10()`, not linear.
+- No single geom works from n=10 to n=10k: point-based geoms (jitter/
+  quasirandom/beeswarm/dotplot) show raw data but overplot at high n;
+  density-based geoms (density/violin) scale but hide n and can imply
+  false structure at low n. A density/violin + point overlay is the
+  practical middle ground.
+- `geom_beeswarm()` slows down past ~1,000 points/group; `geom_quasirandom()`
+  scales to any n - prefer it when group sizes are mixed or unknown.
+- `geom_dotplot()`'s `binwidth` is in data units, not counts - needs a
+  per-group binwidth, a poor fit for comparing very differently sized groups.
+- Colour a swarm/quasirandom plot with an evenly-spaced discrete palette
+  (`colorspace::scale_colour_discrete_qualitative()`), not this project's
+  `viridis` default - viridis reads unevenly once only 2-3 levels are
+  pulled from it.
 :::
 
 # The data

@@ -1,17 +1,5 @@
 ---
-# Render via `targets::tar_make()` (the `render_manuscript` target in
-# _targets.R), not `quarto render` directly - see manuscript.qmd.
-#
-# Minimal reproducible example (MRE) for image FILE FORMATS specifically
-# - PNG, JPEG, SVG, PDF, TIFF, created elsewhere and loaded from a file
-# (not generated inline by an R chunk - see plots-mre.qmd for that, and
-# diagrams-mre.qmd for Mermaid/Graphviz/cetz/ggraph, both split out of
-# this notebook once it grew past "file formats"). Across HTML, docx, and
-# typst (PDF) output - render all three formats and open them next to
-# each other.
-#
-# To surface this notebook in the site navigation, see the comment in
-# supplementary/notebook-template.qmd.
+# Render via tar_make(), not quarto render directly - see CLAUDE.md.
 title: "Image formats: PNG, JPEG, SVG, PDF, TIFF"
 ---
 
@@ -29,32 +17,21 @@ set.seed(1)
 
 ::: {.callout-tip}
 # The Short Version
-- PNG and JPEG are the safe defaults — they work everywhere with no warnings
-- SVG is native (vector) in html and typst, but needs `rsvg-convert` on
-  PATH for docx — without it, pandoc warns and the docx image has no raster
-  fallback
-- **Which SVG device wrote the file matters, not just "it's SVG"**:
-  `svglite` (used throughout this project) writes real `<text>`
-  elements; base R's `svg()` (Cairo) converts every character to a
-  vector-outline glyph referenced via `<use xlink:href="#glyph-N">` —
-  a pattern with documented Firefox-specific rendering fragility that
-  `svglite`'s approach never exercises. Already the safer choice here;
-  see the SVG section for why it matters.
-- **A referenced PDF figure fails quietly, the opposite of TIFF**: typst
-  embeds it correctly as real vector content, but html renders it as a
-  blank box (confirmed in an actual browser, not just the markup — this
-  project's `lightbox: true` even changes *how* it fails, see the
-  section below) and docx embeds raw PDF bytes into a picture element
-  that almost certainly can't decode them — both with zero warning.
-  Treat PDF as submission-only output, not something to embed directly.
-- **TIFF hard-errors typst outright** — and because `tar_quarto()` renders
-  all formats in one pass, that one error blocks html and docx from being
-  updated too, even though they'd have rendered fine on their own
-- Fine text/thin lines that look fine at 100% become illegible once a
-  figure is scaled down to fit page width — check the actual rendered
-  output at its real size, not the source image
-- Uncompressed TIFF is enormous (~24MB in testing here) versus PNG/JPEG for
-  the same content — compress it if it has to go in the repo
+- PNG/JPEG are the only formats that work everywhere with zero warnings.
+- SVG is native/vector in html and typst, but docx needs `rsvg-convert`
+  on PATH or the image falls back to nothing; use `svglite` (real
+  `<text>`), not base R's `svg()` (glyph-outline refs with documented
+  Firefox fragility).
+- A referenced PDF figure fails quietly in html (blank box) and docx (raw
+  bytes Word can't decode) — only typst embeds it correctly. Treat PDF as
+  submission-only output, not something to embed directly.
+- TIFF hard-errors typst outright, and since `tar_quarto()` renders all
+  formats in one pass, that blocks html/docx from updating too — a
+  stale-looking render can mean a typst error, not "didn't run."
+- Check figures at their actual rendered size, not authoring size —
+  fine text/thin lines can become illegible once scaled to page width;
+  compress TIFF before committing (uncompressed ~24MB vs ~350-850KB for
+  PNG/JPEG).
 :::
 
 # Why this notebook exists

@@ -1,26 +1,12 @@
-<!-- manuscript/tables/_tbl-01-example.qmd ----
-     Include partial, not a page - the leading underscore keeps Quarto's
-     website renderer from also rendering this as its own page (same
-     convention as _quarto.yml/_freeze/_targets). Kept thin: the table
-     itself lives in tbl-01-example.R via the pipeline; this file just
-     pulls that target's value in via {{< include >}}. Needs its own
-     library(flextable) call - without it the object prints as a dumped
-     internal structure, since the print method's package isn't
-     guaranteed loaded in this render session just because it built the
-     object upstream.
-
-     flextable_use_format_font() (R/functions.R) overrides flextable's
-     Arial default to match each format's own body font - see its roxygen
-     comment for why this must happen here at print time, not at build
-     time in tbl-01-example.R. -->
+<!-- Include partial, not a page (see CLAUDE.md's "Standalone submission
+     exports"). Needs its own library(flextable) - without it the object
+     prints as a dumped internal structure. -->
 
 ```{r}
 #| label: tbl-01-example
 #| tbl-cap: "Example table generated from the pipeline."
 library(flextable)
-# R/functions.R isn't auto-sourced into Quarto's render session - tar_source()
-# only runs inside the targets pipeline's R session.
-source(here::here("R/functions.R"))
+source(here::here("R/functions.R")) # not auto-sourced into Quarto's session
 targets::tar_read(tbl_01_example, store = here::here("_targets")) |>
   flextable_use_format_font()
 ```

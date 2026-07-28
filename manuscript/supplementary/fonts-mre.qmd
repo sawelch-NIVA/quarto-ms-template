@@ -1,12 +1,5 @@
 ---
-# Render via `targets::tar_make()` (the `render_manuscript` target in
-# _targets.R), not `quarto render` directly - see manuscript.qmd.
-#
-# Minimal reproducible example (MRE) for fonts in ggplot2 figures
-# specifically - not the document-level fonts (html mainfont/monofont,
-# the docx reference-doc, typst mainfont) already covered in CLAUDE.md,
-# which is a completely separate mechanism from what this notebook is
-# about.
+# Render via tar_make(), not quarto render directly - see CLAUDE.md.
 title: "Fonts in ggplot2: sources and renderers"
 ---
 
@@ -24,55 +17,25 @@ here::i_am("manuscript/supplementary/fonts-mre.qmd")
 
 ::: {.callout-tip}
 # The Short Version
-- **Two entirely separate font systems, easy to conflate**: document-level
-  fonts (html `mainfont`, the docx reference-doc, typst `mainfont` -
-  already in CLAUDE.md) govern prose. Figure-level fonts - what this
-  notebook covers - are resolved by whatever R graphics device drew the
-  plot, a completely different mechanism.
-- **A reproducibility gap confirmed hiding in plain sight**: Fira
-  Sans/Fira Code (used throughout this project) are installed on this
-  development machine, confirmed via `systemfonts::system_fonts()` - but
-  nothing in this repo installs them anywhere. Nothing has broken *yet*
-  only because of what happens to already be on this one machine.
-- **`systemfonts::register_font()` + `ragg::agg_png()` is the recommended
-  combination** - confirmed to correctly render a font registered from an
-  arbitrary local *file*, not just a system-installed font. This is the
-  realistic case for a future brand font: a licensed file someone hands
-  you, not a Google Fonts catalog entry.
-- **`showtext` + `sysfonts::font_add_google()` works for remote web
-  fonts, but has a confirmed real footgun**: `showtext_opts(dpi = )` must
-  match the actual device DPI, or text renders at the wrong size relative
-  to the rest of the plot - confirmed by rendering the identical plot both
-  ways.
-- **`svglite` handles registered fonts differently, confirmed by
-  inspecting the raw SVG**: it references the font by its own internal
-  name, not whatever alias you registered it under, and does not embed
-  it - unlike a raster PNG, the SVG isn't self-contained.
-- **`extrafont` is confirmed a poor fit for this project**:
-  `font_import()` only scans system font directories and hard-errors
-  (not just "finds nothing") when asked about a font that lives anywhere
-  else - exactly the local-file case this project actually needs.
-- **Root-caused the warning from `plots-mre.qmd`**: `font family not
-  found in Windows font database` is the *base* `png()` device's own
-  legacy Windows GDI font lookup failing - confirmed by reproducing it
-  with `png()` and watching it vanish with `ragg::agg_png()`. Fixed
-  project-wide: `manuscript/_quarto.yml` now sets `knitr: opts_chunk:
-  dev: "ragg_png"`.
-- **Colour emoji glyphs render correctly through `ragg::agg_png()`** -
-  worth stating plainly because it's not the safe assumption: most R
-  graphics devices historically could not draw colour (COLR/CBDT) emoji
-  fonts at all. Confirmed working here, not assumed.
-- **The real footgun isn't colour vs monochrome, it's whole-string font
-  overrides**: setting `element_text(family = "Noto Emoji")` for a title
-  that mixes an emoji with ordinary words visibly wrecked the Latin
-  text's spacing, because that font has no real Latin glyphs to fall
-  back on - confirmed side by side against the same override with an
-  OS-integrated colour emoji font, which didn't have this problem.
-  Isolating the emoji to its own `ggtext` span fixes it - but only once
-  the CSS `font-family` value is actually quoted; unquoted, a two-word
-  family name silently failed to match at all, confirmed by the glyph
-  rendering in the wrong (colour, not requested-monochrome) font with no
-  warning.
+- Two separate font systems: document-level fonts (html/docx/typst
+  `mainfont` - already in CLAUDE.md) govern prose; figure-level fonts are
+  resolved by whichever R graphics device drew the plot.
+- **A real reproducibility gap**: Fira Sans/Code (used throughout this
+  project) are installed on this dev machine but nothing in the repo
+  installs them - works today by accident, not by design.
+- For a local/licensed font file, `systemfonts::register_font()` +
+  `ragg::agg_png()` renders it correctly; `showtext`+`font_add_google()`
+  covers web fonts but needs `showtext_opts(dpi=)` to match the device
+  DPI. `extrafont::font_import()` hard-errors on anything outside system
+  font directories. `svglite` references a registered font by internal
+  name and doesn't embed it.
+- **Root-caused the `plots-mre.qmd` warning**: `font family not found in
+  Windows font database` is base `png()`'s legacy GDI lookup failing -
+  fixed project-wide via `knitr: opts_chunk: dev: "ragg_png"`.
+- Colour emoji glyphs render correctly through `ragg::agg_png()` - but a
+  whole-string font override (e.g. `element_text(family = "Noto Emoji")`)
+  on mixed emoji+text wrecks the Latin spacing; isolate the emoji to its
+  own quoted `ggtext` span instead.
 :::
 
 # Why this notebook exists

@@ -1,18 +1,5 @@
 ---
-# Render via `targets::tar_make()` (the `render_manuscript` target in
-# _targets.R), not `quarto render` directly - see manuscript.qmd.
-#
-# A comparison of R's most-used colour palette packages for scientific
-# figures - ggplot2 defaults, RColorBrewer, viridis, scico, MetBrewer, and
-# colorspace - across the three ggplot scale mechanisms (continuous `_c`,
-# discrete `_d`, binned `_b`), plus colorspace's lighten()/darken() for
-# deriving coherent palette families, and a worked example of the tension
-# between thematically "obvious" colours and colours that actually survive
-# colour-vision deficiency (CVD). Uses a synthetic-but-structured
-# water-quality dataset, not `diamonds`.
-#
-# To surface this notebook in the site navigation, see the comment in
-# supplementary/notebook-template.qmd.
+# Render via tar_make(), not quarto render directly - see CLAUDE.md.
 title: "Colour: palettes, colorspace, and semantics"
 ---
 
@@ -39,42 +26,22 @@ set.seed(42)
 
 ::: {.callout-tip}
 # The Short Version
-- **ggplot2's defaults are the weakest option shown here** in every scale
-  type tested — muddy low-contrast continuous gradients, and a diverging
-  scale built from literal `"red"`/`"blue"` that's too saturated and not
-  neutral at its midpoint.
-- **viridis is a genuinely safe default** — but "safe" isn't
-  "unconditionally good": reversed and pushed dark (`mako`, `direction =
-  -1`) it got dark enough to threaten legibility of gridlines/labels in a
-  filled tile. Direction and range still need checking, even with
-  viridis.
-- **scico is the closest thing to a viridis for earth/ocean/water
-  science** specifically — same perceptually-uniform design lineage, and
-  its palettes (`davos`, `vik`, `broc`, ...) are the field-standard choice
-  in a lot of geoscience journals. Probably the single most relevant
-  recommendation here for this project's actual domain.
-- **Once a diverging palette avoids the two real sins** (saturated named
-  colours as endpoints, a non-neutral midpoint), **RColorBrewer,
-  `scale_*_steps2()`, and colorspace's `diverging_hcl` converge on nearly
-  the same result** — the specific package matters less than getting
-  that structure right.
-- **`paletteer` consolidates RColorBrewer/viridis/scico/MetBrewer/and
-  thousands more behind one interface** — but confirmed it is not a
-  strictly identical drop-in for the source package: the same
-  `MetBrewer::Hokusai1` palette silently dropped an 8th category (blank
-  bar, no warning) through `paletteer`'s default settings, while calling
-  `MetBrewer::met.brewer(..., 8)` directly interpolated to fill it. Check
-  a palette's actual length through `paletteer` before trusting it with
-  more categories than its source package would give it credit for.
-- **`colorspace::lighten()`/`darken()` can derive a whole coherent
-  palette family from one base hue per group** — the pattern from the
-  script that prompted this notebook, reproduced below.
-- **The intuitive thing — "water is blue" — was tested against a
-  statistically-spaced palette under CVD simulation, and lost.**
-  Eyeballed "realistic" hues (water-blue, earth-brown, air-grey) tend to
-  cluster in similar lightness/chroma, which is exactly what a
-  colour-vision-deficient reader can't distinguish. See the callout in
-  that section for what to do instead of abandoning theme entirely.
+- ggplot2's own defaults are the weakest option tested — low-contrast
+  continuous gradients, and a diverging scale that isn't neutral at its
+  midpoint.
+- `viridis` is a safe default, but check direction/range: pushed dark
+  (`mako`, `direction = -1`) it can threaten gridline/label legibility.
+- `scico` is the closest thing to a viridis for earth/ocean/water science
+  specifically (Crameri's scientific colour maps) — the more field-relevant
+  default for this project's domain.
+- `paletteer` consolidates RColorBrewer/viridis/scico/MetBrewer behind one
+  interface, but isn't a strict drop-in: `MetBrewer::Hokusai1` through
+  `paletteer` silently dropped an 8th category with no warning. Check a
+  palette's actual length before trusting it with more categories.
+- Eyeballed "thematic" colours (water=blue, earth=brown) cluster in similar
+  lightness/chroma and separate worse under CVD simulation than an
+  algorithmic `qualitative_hcl` palette — anchor hue thematically, then
+  force the spacing to match, and re-check under CVD simulation.
 :::
 
 # Why this notebook exists

@@ -1,6 +1,5 @@
 ---
-# ! Render via `targets::tar_make()` (the `render_manuscript` target in
-# ! _targets.R), not `quarto render` directly - see manuscript.qmd.
+# Render via tar_make(), not quarto render directly - see CLAUDE.md.
 title: "Quarto rendering pipeline"
 ---
 

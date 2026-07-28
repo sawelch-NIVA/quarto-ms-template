@@ -1,20 +1,12 @@
 ---
-# ! Render via `targets::tar_make()` (the `render_manuscript` target in
-# ! _targets.R), not `quarto render` directly - see manuscript.qmd.
+# Render via tar_make(), not quarto render directly - see CLAUDE.md.
 #
-# Files under supplementary/ render as part of the site automatically
-# (Quarto renders every .qmd by default) but aren't added to the
-# navbar/sidebar automatically. To surface this notebook in the nav, add
-# an entry under `website:` in _quarto.yml:
-#
+# To add this notebook to the nav (optional - it renders either way):
 #   website:
 #     navbar:
 #       left:
 #         - href: supplementary/notebook-template.qmd
 #           text: "Supplementary: <short label>"
-#
-# Leave it unlinked to keep it off the public nav (e.g. a scratch
-# notebook) - it still renders, just isn't listed.
 title: "Notebook Template"
 ---
 
@@ -28,22 +20,12 @@ formulaic, depending on the project's needs.
 ```{r}
 #| label: setup
 #| include: false
-
-# Set include: false wherever you load packages - library() output is
-# session-specific noise, rarely relevant to the document.
 library(targets)
 library(here)
-
-# i_am()'s argument is THIS file's own path relative to the project root,
-# not _targets.R's. Anchors here() regardless of where this notebook is knit from.
 i_am("manuscript/supplementary/notebook-template.qmd")
 
 source(here("R/functions.R"))
-# viridis instead of ggplot2's own defaults for any plot in this notebook
-# that doesn't set its own scale_*_() - see set_default_palettes()'s own
-# comment (R/functions.R) and colour-mre.qmd for why. Delete this call if
-# a notebook has a real reason to want ggplot2's un-overridden defaults.
-set_default_palettes()
+set_default_palettes() # viridis defaults - see colour-mre.qmd
 ```
 
 {{< include _back-to-manuscript.qmd >}}
@@ -53,12 +35,7 @@ in Word/PDF) - it looks bad, and you can't reference it.
 
 ```{r}
 #| label: explore
-# store= is required, not optional: tar_read()'s default store lookup is
-# cwd-relative, and cwd during chunk execution isn't reliable across
-# render paths (confirmed: manuscript/ under a direct `quarto render`, but
-# the repo root under this project's actual tar_quarto() render - see
-# CLAUDE.md). here("_targets") works either way since here() resolves via
-# upward sentinel search, not cwd.
+# store= is required, not optional - see CLAUDE.md.
 data <- tar_read(import_data, store = here("_targets"))
 head(data)
 ```

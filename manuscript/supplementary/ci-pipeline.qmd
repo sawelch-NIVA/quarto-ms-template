@@ -1,6 +1,5 @@
 ---
-# ! Render via `targets::tar_make()` (the `render_manuscript` target in
-# ! _targets.R), not `quarto render` directly - see manuscript.qmd.
+# Render via tar_make(), not quarto render directly - see CLAUDE.md.
 title: "Continuous integration: rebuilding the pipeline on every push"
 ---
 
@@ -15,36 +14,22 @@ here::i_am("manuscript/supplementary/ci-pipeline.qmd")
 
 ::: {.callout-tip}
 # The Short Version
-- `.github/workflows/render.yml` runs `targets::tar_make()` on every push
-  and PR - a fresh clone rebuilds the pipeline and renders html/docx/typst
-  from scratch, on a machine that isn't anyone's local setup.
-- No `DESCRIPTION` file exists (this isn't an R package), so R packages
-  are listed explicitly in the workflow and must be kept in sync with
-  `runme.R`'s `required_pkgs` by hand - there's no single source of truth
-  for the package list.
-- `r-lib/actions/setup-r-dependencies` also installs the Ubuntu system
-  libraries these packages need (libcurl, libmagick++, Cairo, ...) via
-  `pak`'s sysreqs database - plain `install.packages()` on a bare runner
-  would fail on several of these without it.
-- CI installs `rsvg-convert`, closing the one gap this template could
-  never verify locally (this development environment has no
-  Word/LibreOffice or `rsvg-convert` - see
-  [images-mre.qmd](images-mre.qmd)'s SVG section) - CI's docx render is
-  clean where the local one has an unavoidable warning.
-- Rendered output uploads as a workflow artifact even on failure, since a
-  partial `output/` (some formats rendered, one didn't) is itself the
-  useful debugging signal for the "one bad format blocks the others"
-  gotcha documented in CLAUDE.md.
-- **A real first run hung for ~3 hours at `render_manuscript` and had to
-  be cancelled by hand** - see "A real CI failure" below. `timeout-minutes:
-  15` now caps that, and an explicit `quarto install chrome-headless-shell`
-  step is a hypothesis fix for the actual cause, not yet confirmed working.
-- **On push to `main` only**, a second `deploy` job publishes
-  `manuscript/output/` to GitHub Pages via the Actions-native artifact
-  deploy (`upload-pages-artifact` + `deploy-pages`), not a `gh-pages`
-  branch - see "Publishing to GitHub Pages" below for why, and why
-  switching to the branch approach later would be cheap if that tradeoff
-  ever stops making sense.
+- `.github/workflows/render.yml` runs `tar_make()` on every push/PR - a
+  fresh clone rebuilds and renders html/docx/typst from scratch.
+- No `DESCRIPTION` file exists, so packages are listed by hand in the
+  workflow (kept in sync with `runme.R`'s `required_pkgs`) -
+  `setup-r-dependencies` also resolves Ubuntu system libraries (libcurl,
+  Cairo, ...) via `pak`'s sysreqs database, which plain `install.packages()`
+  wouldn't.
+- CI installs `rsvg-convert`, closing the one gap this dev environment
+  can't verify locally - see [images-mre.qmd](images-mre.qmd).
+- Rendered output uploads as a workflow artifact even on failure - a
+  partial `output/` is itself the debugging signal for the "one bad
+  format blocks the others" gotcha in CLAUDE.md.
+- **A real first run hung ~3 hours at `render_manuscript`** -
+  `timeout-minutes: 15` now caps that; a separate `deploy` job (push to
+  `main` only) publishes `manuscript/output/` to GitHub Pages via the
+  Actions-native artifact deploy, not a `gh-pages` branch.
 :::
 
 # Why this notebook exists

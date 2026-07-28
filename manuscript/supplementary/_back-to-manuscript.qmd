@@ -1,22 +1,8 @@
-<!-- manuscript/supplementary/_back-to-manuscript.qmd ----
-     Shared include partial - leading underscore keeps Quarto's website
-     renderer from also rendering this as its own page (see "Directory
-     layout" in CLAUDE.md/README.md). html readers get the sidebar nav
-     for free, so this is hidden there; docx/typst readers of a
-     supplementary notebook have no nav, so they need an explicit way
-     back. Reads MANUSCRIPT_BASENAME (R/functions.R) instead of
-     hardcoding "index", so renaming manuscript.qmd only needs updating
-     one place.
-
-     Uses here::here(), not a cwd-relative path - confirmed that
-     execute-dir: project does NOT reliably mean cwd = manuscript/ during
-     chunk execution: a plain `quarto render manuscript` has cwd =
-     manuscript/, but this project's actual tar_quarto() render has cwd =
-     the repo root instead (reproduced with a getwd()/list.files() dump
-     under both invocation paths). here::here() works either way since it
-     resolves via upward sentinel-file search, not cwd, and the including
-     file's own here::i_am() call (in its setup chunk, which must run
-     before this include) has already anchored it for this session. -->
+<!-- Shared include partial (leading underscore - see CLAUDE.md). Adds a
+     back-link for docx/typst readers, who have no sidebar nav. Uses
+     here::here(), which needs the including file's own here::i_am() to
+     have already run - see CLAUDE.md's "Consequence of nesting
+     manuscript/..." section. -->
 
 ::: {.content-hidden when-format="html"}
 
