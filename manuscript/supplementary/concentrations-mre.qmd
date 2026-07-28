@@ -1,0 +1,362 @@
+---
+# Render via `targets::tar_make()` (the `render_manuscript` target in
+# _targets.R), not `quarto render` directly - see manuscript.qmd.
+#
+# A comparison of ways to display concentration data concisely: density,
+# box/violin, dotplot, and beeswarm/quasirandom variants, on log-normal
+# data spanning very different sample sizes (n=10 to n=10k) and
+# concentration scales - the realistic shape of e.g. pooled monitoring
+# data across sites/analytes. Purpose is to compare legibility and
+# scalability, not to recommend one plot type for every case.
+#
+# To surface this notebook in the site navigation, see the comment in
+# supplementary/notebook-template.qmd.
+title: "Concentrations: displaying skewed data concisely"
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+library(scales)
+library(ggbeeswarm)
+library(colorspace)
+library(here)
+here::i_am("manuscript/supplementary/concentrations-mre.qmd")
+
+source(here("R/functions.R"))
+# viridis instead of ggplot2's own defaults - see colour-mre.qmd. Most
+# plots below set an explicit fill/colour anyway, so this mainly affects
+# the density-overlay and dotplot-by-group plots.
+set_default_palettes()
+```
+
+{{< include _back-to-manuscript.qmd >}}
+
+::: {.callout-tip}
+# The Short Version
+- Concentration data is usually log-normal and often spans several orders
+  of magnitude across groups - plot on a log10 x-axis
+  (`scale_x_log10(labels = label_log())`) rather than linear, or the small
+  groups collapse to an unreadable spike.
+- **No single geom works well across n=10 to n=10k.** Point-based geoms
+  (jitter, quasirandom, beeswarm, dotplot) show individual observations
+  and work well for small/mid n, but degrade into overplotted blobs at
+  large n. Density-based geoms (density, violin) do the opposite - stable
+  at any n, but hide sample size and can imply structure for n=10 that
+  isn't really there.
+- **A density/violin + point-based overlay is the practical middle
+  ground** for a dataset with mixed group sizes shown together: box or
+  violin for shape, thin jittered/quasirandom points on top for the raw n.
+  Faceting instead of overlaying colour avoids a busy shared axis when
+  group count grows.
+- **`geom_beeswarm()` (strict non-overlap) is only practical below
+  roughly 1,000 points per group** - it visibly slows down past that,
+  confirmed here on the n=10k group. `geom_quasirandom()` (van der Corput
+  sequence, density-proportional but not strictly non-overlapping) scales
+  to any n and is the safer default when group sizes are unknown or mixed.
+- **`geom_dotplot()`'s `binwidth` is in data units, not counts** - the
+  same `binwidth` that looks right for n=10 is far too coarse for n=1k and
+  produces a solid, dot-free-looking block at n=10k. It needs a
+  per-group/per-panel `binwidth`, which makes it a poor fit for directly
+  comparing groups of very different size on one shared scale.
+- **Colouring a swarm/quasirandom plot by group needs an evenly-spaced
+  discrete palette, not this project's `viridis` default** - `viridis`
+  is designed to be read along its full gradient; pulling only 2-3
+  discrete levels from it grabs uneven endpoints (dark purple next to
+  pale yellow) that read unevenly once alpha-blended over overlapping
+  points. `colorspace::scale_colour_discrete_qualitative()` fixes this -
+  same recommendation as `colour-mre.qmd`.
+:::
+
+# The data
+
+A synthetic dataset built to mimic real concentration data: three groups
+at genuinely different sample sizes and concentration scales, each drawn
+from a true log-normal distribution (`rlnorm()`, not
+`log1p(rnorm())`, which is not log-normal and understates skew).
+
+```{r}
+#| label: data
+set.seed(8472)
+
+combined <- bind_rows(
+  tibble(
+    x = rlnorm(10000, meanlog = log(100), sdlog = 0.5),
+    group = "Large (n=10k)"
+  ),
+  tibble(
+    x = rlnorm(1000, meanlog = log(10), sdlog = 0.8),
+    group = "Mid (n=1k)"
+  ),
+  tibble(x = rlnorm(10, meanlog = log(1), sdlog = 1.0), group = "Small (n=10)")
+) |>
+  mutate(
+    group = factor(
+      group,
+      levels = c("Small (n=10)", "Mid (n=1k)", "Large (n=10k)")
+    ),
+    # geom_dotplot() bins in data units, not log units - pre-transform.
+    x_log10 = log10(x)
+  )
+
+theme_set(theme_bw(base_size = 9))
+
+# Shared log10 x scale with tidy axis labels, reused across most plots below.
+log_x <- list(
+  scale_x_log10(labels = label_log()),
+  labs(x = "Concentration")
+)
+```
+
+# Density variants
+
+Density estimates never overplot regardless of n, but a raw density curve
+gives no sense of how many points it's built from - `n=10` and `n=10k`
+can produce similarly smooth-looking curves.
+
+```{r}
+#| label: fig-density-overlay
+#| fig-cap: "Density, overlaid - easy to compare shape, but n is invisible"
+#| fig-width: 7
+ggplot(combined, aes(x, fill = group, color = group)) +
+  geom_density(alpha = 0.3, linewidth = 0.5) +
+  log_x +
+  labs(fill = NULL, color = NULL) +
+  theme(legend.position = "bottom")
+```
+
+```{r}
+#| label: fig-density-facet
+#| fig-cap: "Density, faceted on a shared x-axis"
+#| fig-width: 6
+#| fig-height: 6
+ggplot(combined, aes(x)) +
+  geom_density(fill = "steelblue", alpha = 0.5, linewidth = 0.4) +
+  facet_wrap(~group, ncol = 1, scales = "fixed") +
+  log_x
+```
+
+Adding a rug restores some sense of n and shows individual points for the
+small group, at the cost of the rug itself overplotting for the large one:
+
+```{r}
+#| label: fig-density-rug
+#| fig-cap: "Density + rug - rug is informative at n=10, solid at n=10k"
+#| fig-width: 7
+ggplot(combined, aes(x, color = group)) +
+  geom_density(linewidth = 0.6) +
+  geom_rug(alpha = 0.4, length = unit(0.05, "npc")) +
+  log_x +
+  labs(color = NULL) +
+  theme(legend.position = "bottom")
+```
+
+# Box, violin, and jitter
+
+```{r}
+#| label: fig-box
+#| fig-cap: "Boxplot - compact, but hides multimodality and n"
+p_box <- ggplot(combined, aes(x, y = group)) +
+  geom_boxplot(outlier.size = 0.5) +
+  log_x +
+  labs(y = NULL)
+
+p_box
+```
+
+```{r}
+#| label: fig-violin
+#| fig-cap: "Violin (scale='width') - shape at a glance, same n-blindness as density"
+p_viol <- ggplot(combined, aes(x, y = group)) +
+  geom_violin(scale = "width") +
+  log_x +
+  labs(y = NULL)
+
+p_viol
+```
+
+A plain jittered strip shows every point, but overplots badly once n gets
+into the thousands:
+
+```{r}
+#| label: fig-strip
+#| fig-cap: "Jitter strip - true to the data at small n, a smear at large n"
+ggplot(combined, aes(x, y = group)) +
+  geom_jitter(height = 0.25, alpha = 0.15, size = 0.6) +
+  log_x +
+  labs(y = NULL)
+```
+
+## Combining box/violin with the raw points
+
+Layering a box or violin with the underlying points keeps both the
+summary shape and a sense of n, and reads reasonably at every group size
+tested here:
+
+```{r}
+#| label: fig-box-strip
+#| fig-cap: "Box + jitter - outlier points hidden on the box to avoid doubling them up"
+#| fig-width: 7
+p_box_strip <- ggplot(combined, aes(x, y = group)) +
+  geom_jitter(height = 0.25, alpha = 0.15, size = 0.6, color = "grey50") +
+  geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+  log_x +
+  labs(y = NULL)
+
+p_box_strip
+```
+
+```{r}
+#| label: fig-violin-box
+#| fig-cap: "Violin + box, nested - shape and quartiles together"
+#| fig-width: 7
+p_viol_box <- ggplot(combined, aes(x, y = group)) +
+  geom_violin(scale = "width", fill = "steelblue", alpha = 0.4) +
+  geom_boxplot(width = 0.12, outlier.size = 0.3, fill = "white") +
+  log_x +
+  labs(y = NULL)
+
+p_viol_box
+```
+
+# Dotplots
+
+`geom_dotplot()`'s `binwidth` is in the units of the (here, already
+log10-transformed) x-axis, not a point count - the same value has to be
+tuned per group size or the plot either collapses to one column (too
+coarse) or thins to invisibility (too fine). Below, each group gets its
+own tuned `binwidth`, on its own x-range:
+
+```{r}
+#| label: fig-dotplot-tuned
+#| fig-cap: "Dotplots, tuned per group - readable individually, not directly comparable"
+#| fig-width: 6
+#| fig-height: 7
+dot_scale <- scale_x_continuous(
+  labels = \(b) label_log()(10^b),
+  name = "Concentration"
+)
+
+p_dot_small <- ggplot(filter(combined, group == "Small (n=10)"), aes(x_log10)) +
+  geom_dotplot(binwidth = 0.12, stackdir = "center", alpha = 0.7, stroke = 0) +
+  dot_scale +
+  scale_y_continuous(NULL, breaks = NULL) +
+  labs(title = "Small (n=10)")
+
+p_dot_mid <- ggplot(filter(combined, group == "Mid (n=1k)"), aes(x_log10)) +
+  geom_dotplot(binwidth = 0.03, stackdir = "center", alpha = 0.5, stroke = 0) +
+  dot_scale +
+  scale_y_continuous(NULL, breaks = NULL) +
+  labs(title = "Mid (n=1k)")
+
+p_dot_big <- ggplot(filter(combined, group == "Large (n=10k)"), aes(x_log10)) +
+  geom_dotplot(binwidth = 0.005, stackdir = "center", alpha = 0.3, stroke = 0) +
+  dot_scale +
+  scale_y_continuous(NULL, breaks = NULL) +
+  labs(title = "Large (n=10k)")
+
+p_dot_small / p_dot_mid / p_dot_big
+```
+
+Forcing one `binwidth` and one shared x-range across all three groups
+makes them directly comparable, but the large group loses individual
+dots entirely - it reads as a solid bar rather than n=10,000 points:
+
+```{r}
+#| label: fig-dotplot-shared
+#| fig-cap: "Dotplots, faceted on a common x-axis and binwidth"
+#| fig-width: 6
+#| fig-height: 6
+x_lims <- range(combined$x_log10) + c(-0.05, 0.05)
+
+ggplot(combined, aes(x_log10)) +
+  geom_dotplot(binwidth = 0.04, stackdir = "center", alpha = 0.6, stroke = 0) +
+  facet_wrap(~group, ncol = 1, scales = "fixed") +
+  scale_x_continuous(
+    labels = \(b) label_log()(10^b),
+    name = "Concentration",
+    limits = x_lims
+  ) +
+  scale_y_continuous(NULL, breaks = NULL) +
+  coord_transform(clip = "off")
+```
+
+**Takeaway: dotplots are most useful for a single small/mid-sized group,
+or a handful of groups of similar n shown side by side** - they stop
+being informative once one group's n is orders of magnitude larger than
+another's on the same panel.
+
+# Beeswarm and quasirandom
+
+`ggbeeswarm` provides two point-jitter strategies: `geom_quasirandom()`
+(a van der Corput sequence - deterministic, density-proportional, not
+strictly non-overlapping) and `geom_beeswarm()` (strict non-overlap,
+visibly slower and impractical much above ~1,000 points per group).
+
+Colouring points by group needs a discrete scale that stays perceptually
+even at whatever group count you have - this project's own default
+(`set_default_palettes()`, `viridis`) is designed to be read along its
+full gradient, so pulling just 2-3 discrete levels from it grabs uneven
+endpoints (a dark purple next to a pale yellow), which reads unevenly
+once alpha-blended over overlapping points.
+`colorspace::scale_colour_discrete_qualitative()` picks hues at matched
+lightness/chroma instead - the same fix `colour-mre.qmd` recommends for
+categorical colour generally:
+
+```{r}
+#| label: fig-quasirandom
+#| fig-cap: "Quasirandom - scales to any n, denser regions read as denser"
+p_quasi <- ggplot(combined, aes(x, y = group, colour = group)) +
+  geom_quasirandom(orientation = "y", alpha = 0.3, size = 0.75) +
+  scale_colour_discrete_qualitative() +
+  log_x +
+  labs(y = NULL, colour = NULL) +
+  theme(legend.position = "bottom")
+
+p_quasi
+```
+
+```{r}
+#| label: fig-quasirandom-box
+#| fig-cap: "Quasirandom + box"
+#| fig-width: 7
+p_quasi_box <- ggplot(combined, aes(x, y = group)) +
+  geom_quasirandom(
+    orientation = "y",
+    alpha = 0.15,
+    size = 0.5,
+    color = "grey40"
+  ) +
+  geom_boxplot(alpha = 0.7, outlier.shape = NA) +
+  log_x +
+  labs(y = NULL)
+
+p_quasi_box
+```
+
+`geom_beeswarm()` restricted to the small + mid groups only - confirmed
+by direct testing (and SAW) that including the n=10k group here makes the render
+noticeably slower (and basically uninterpretable), consistent with the "impractical above ~1k points"
+guidance in the package's own documentation:
+
+
+```{r}
+#| label: fig-beeswarm-smallmid
+#| fig-cap: "Beeswarm, small + mid groups only - strict non-overlap, clearest shape at low n"
+p_bee_smallmid <- ggplot(
+  filter(combined, group != "Large (n=10k)"),
+  aes(x, y = group, colour = group)
+) +
+  geom_beeswarm(orientation = "y", alpha = 0.5, size = 1, cex = 1.5) +
+  scale_colour_discrete_qualitative() +
+  log_x +
+  labs(y = NULL, colour = NULL) +
+  theme(legend.position = "bottom")
+
+p_bee_smallmid
+```
+
+# References

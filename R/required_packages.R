@@ -36,6 +36,15 @@ required_pkgs <- c(
   # Used by supplementary/plots-mre.qmd - drop if you delete that notebook.
   "ggtext",
   "patchwork",
+  # Used by supplementary/concentrations-mre.qmd - drop if you delete that
+  # notebook. dplyr/scales are also pulled in transitively by other listed
+  # packages, but listed explicitly here since this notebook calls them
+  # directly (see the tidygraph/NetSwan incident below for why an
+  # implicit transitive dependency isn't safe to rely on).
+  "dplyr",
+  "scales",
+  "ggbeeswarm",
+  "colorspace",
   # Used by supplementary/fonts-mre.qmd and generate-fonts.R - drop if you
   # delete that notebook. systemfonts/ragg is the recommended combo;
   # showtext/sysfonts and extrafont are also loaded there for direct

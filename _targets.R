@@ -91,14 +91,15 @@ list(
     ),
     format = "file"
   ),
-  # Renders the whole Quarto project at manuscript/ (manuscript.qmd,
+  # # Renders the whole Quarto project at manuscript/ (manuscript.qmd,
   # supplementary/*.qmd, ...) - see manuscript/_quarto.yml. tarchetypes
   # scans each .qmd for tar_read()/tar_load() calls and wires up matching
   # target dependencies automatically - confirmed this also follows
   # {{< include >}}'d partials, so render_manuscript correctly depends on
   # tbl_01_example/fig_01_example even though they're only referenced
   # inside those partials, not manuscript.qmd itself.
-  # quiet_quarto_scan() (R/functions.R) discards the "Error in eval: object
+
+  # # quiet_quarto_scan() (R/functions.R) discards the "Error in eval: object
   # 'is_html' not found" noise this scan prints for every eval: !expr
   # is_html-style chunk across every .qmd - confirmed harmless, see
   # "Pipeline gotchas" in CLAUDE.md; a real error here still stops the
@@ -107,16 +108,7 @@ list(
     name = render_manuscript,
     path = "manuscript",
     execute = TRUE, # keep this unless you know you've just changed text, not code,
-    # Deliberately FALSE, not a debugging leftover: a real CI failure with
-    # quiet = TRUE only ever surfaces "Rerun with quiet = FALSE to see the
-    # full error message" - advice that's useless in a non-interactive
-    # Actions job, since there's no way to rerun with a different flag
-    # without editing code and pushing again anyway. quiet = FALSE trades
-    # louder logs on every successful run for an actually-actionable error
-    # the one time it isn't. Confirmed unrelated to quiet_quarto_scan()
-    # above - that suppresses the dependency-scan noise regardless of this
-    # setting; this controls the real `quarto render` subprocess's own
-    # verbosity.
-    quiet = FALSE
+    quiet = FALSE, # otherwise targets hides quarto errors
+    cache = TRUE # experimental
   ))
 )

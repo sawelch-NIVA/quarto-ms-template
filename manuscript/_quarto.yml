@@ -76,6 +76,8 @@ website:
               icon: journal-code
             - href: supplementary\plots-mre.qmd
               icon: journal-code
+            - href: supplementary\concentrations-mre.qmd
+              icon: journal-code
             - href: supplementary\fonts-mre.qmd
               icon: journal-code
             - href: supplementary\maps-mre.qmd
